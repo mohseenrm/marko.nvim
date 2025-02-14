@@ -22,6 +22,7 @@ function M.filter_marks(project_path)
   return filtered_marks
 end
 
+-- TODO: group and save marks, return only filtered marks
 function M.setup()
   vim.api.nvim_create_autocmd("UIEnter", {
     callback = function()
