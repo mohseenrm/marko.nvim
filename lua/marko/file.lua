@@ -61,7 +61,6 @@ function M.get_config(path)
 	-- create marks path if does not exist, create new file and save content for cwd
 	local res = M.check_path(path)
 	local cwd = vim.fn.getcwd()
-  local test = config.filter_marks(cwd)
   -- print("TEST: " .. test)
 	local base_config = [[
 ]] .. cwd .. [[:
@@ -82,6 +81,7 @@ function M.get_config(path)
 		end
 
 		print(content)
+    config.setup()
     return base_config
 	else
 		-- path does not exist
@@ -99,6 +99,7 @@ function M.get_config(path)
 			return nil, err
 		end
 
+    config.setup()
 		return base_config
 	end
 
