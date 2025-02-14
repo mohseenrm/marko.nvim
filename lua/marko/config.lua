@@ -1,10 +1,13 @@
 local M = {}
 
-local marks = {"A", "B", "C", "D", "E", "F", "G", "H"}
+local marks = {}
+-- INFO: A-Z
+for i = 65, 90 do
+  table.insert(marks, string.char(i))
+end
 
 function M.filter_marks(project_path)
   -- enumerate over marks, check if valid and if starts with project_path
-  print("PROJECT_PATH: " .. project_path)
   local filtered_marks = {}
   for _, mark in ipairs(marks) do
     local content = vim.api.nvim_get_mark(mark, {})
