@@ -1,3 +1,4 @@
+local config = require("marko.config")
 local M = {}
 
 function M.check_path(path)
@@ -18,7 +19,12 @@ function M.create_path(path)
 		return nil, "Failed to create path, err: " .. result
 	end
 
-  -- TODO: create child file
+  local touch_cmd = string.format("touch %s", path)
+  local result = os.execute(touch_cmd)
+
+	if result ~= 0 then
+		return nil, "Failed to create path, err: " .. result
+	end
 	return true
 end
 
@@ -55,11 +61,13 @@ function M.get_config(path)
 	-- create marks path if does not exist, create new file and save content for cwd
 	local res = M.check_path(path)
 	local cwd = vim.fn.getcwd()
+  local test = config.filter_marks(cwd)
+  -- print("TEST: " .. test)
 	local base_config = [[
-    ]] .. cwd .. [[:
-      - A: mark content
-      - B: mark content
-  ]]
+]] .. cwd .. [[:
+  - A: mark content
+  - B: mark content
+]]
 
 	-- path does exist
 	if res then
@@ -74,19 +82,19 @@ function M.get_config(path)
 		end
 
 		print(content)
+    return base_config
 	else
-		print("HERE 2")
 		-- path does not exist
 		local success, err = M.create_path(path)
 
-		if err then
+		if not success then
 			vim.notify("Error creating file path" .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
 			return nil, err
 		end
 
 		local success, err = M.write_file(path, base_config)
 
-		if err then
+		if not success then
 			vim.notify("Error creating file" .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
 			return nil, err
 		end
@@ -94,27 +102,7 @@ function M.get_config(path)
 		return base_config
 	end
 
-	local dir = path:match("(.*/)")
-	if dir then
-		local success, err = M.create_path(dir)
-		if not success then
-			return nil, err
-		end
-	end
-
-	-- if it does, read and parse content
-	local content, err = M.read_file(path)
-	if not content then
-		-- If the file does not exist, create it
-		local success, err = M.create_file(path)
-		if not success then
-			return nil, err
-		end
-		return {}
-	end
-
-	local config = load("return " .. content)()
-	return config
+	return base_config
 end
 
 return M
