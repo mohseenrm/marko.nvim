@@ -29,8 +29,7 @@ function M.filter_marks(project_path)
 			vim.notify("Checking mark " .. mark .. " with path: " .. mark_path, 
 				vim.log.levels.DEBUG, { title = "marko.nvim" })
 				
-			-- Try different ways to match the project path
-			-- Simple string prefix check (most reliable for nested paths)
+			-- Try both direct match and pattern match
 			if string.sub(mark_path, 1, #project_path) == project_path then
 				in_project = true
 				vim.notify("PREFIX MATCH for " .. mark .. ": " .. mark_path .. " starts with " .. project_path,
@@ -61,7 +60,7 @@ function M.filter_marks(project_path)
 	return filtered_marks
 end
 
--- Custom YAML parser to handle multiple directories properly
+-- Custom YAML parser to handle multiple directories with detailed mark information
 function M.parse_config(content)
 	if not content or content == "" then
 		return {}
@@ -70,6 +69,9 @@ function M.parse_config(content)
 	-- Manually parse the YAML to ensure we get all directories
 	local result = {}
 	local current_dir = nil
+	local current_mark = nil
+	local current_mark_data = nil
+	local in_data_section = false
 	local lines = {}
 	
 	-- Split content into lines
@@ -78,37 +80,89 @@ function M.parse_config(content)
 	end
 	
 	for i, line in ipairs(lines) do
-		-- Skip empty lines
+		-- Skip empty lines and comments
 		if line:match("^%s*$") then
-			-- Skip empty lines, but preserve current directory context
+			-- Skip empty lines, but preserve context
 		elseif line:match("^%s*#") then
-			-- Skip comments, but preserve current directory context
+			-- Skip comments, but preserve context
 		else
-			-- Check if this is a directory line (ends with colon)
-			local dir = line:match("^([^:]+):$")
+			-- Check if this is a directory line (ends with colon and doesn't have indent)
+			local dir = line:match("^([^%s][^:]+):$")
 			if dir then
 				-- Found a new directory
 				current_dir = dir
 				result[current_dir] = result[current_dir] or {}
+				current_mark = nil
+				current_mark_data = nil
+				in_data_section = false
 				
-				-- Debug new directory found
 				vim.notify("Parser found directory: " .. current_dir, 
-					vim.log.levels.WARN, { title = "marko.nvim" })
+					vim.log.levels.DEBUG, { title = "marko.nvim" })
+			elseif current_dir and line:match("^%s*-%s+mark:") then
+				-- New style mark entry with explicit mark: field
+				local mark = line:match("^%s*-%s+mark:%s*\"([^\"]+)\"")
+				if mark then
+					-- This is a mark identifier in the new format
+					current_mark = mark
+					current_mark_data = {
+						mark = mark,
+						row = 0,
+						col = 0,
+						buffer = 0,
+						filename = ""
+					}
+					in_data_section = false
+					
+					vim.notify("Parser found mark: " .. current_mark, 
+						vim.log.levels.DEBUG, { title = "marko.nvim" })
+				end
+			elseif current_dir and current_mark and line:match("^%s+data:") then
+				-- Found the data section for a mark
+				in_data_section = true
+			elseif current_dir and current_mark and in_data_section and line:match("^%s+%w+:") then
+				-- This is a property within the data section
+				local prop, value = line:match("^%s+(%w+):%s*(.+)$")
+				if prop and value and current_mark_data then
+					-- Remove quotes if present
+					value = value:gsub('^"(.*)"$', '%1')
+					
+					-- Try to convert to number if appropriate
+					if prop ~= "filename" then
+						local num_value = tonumber(value)
+						if num_value then
+							value = num_value
+						end
+					end
+					
+					-- Set the property in the current mark data
+					current_mark_data[prop] = value
+					
+					-- If this is the last property (filename), add the mark to the result
+					if prop == "filename" then
+						table.insert(result[current_dir], current_mark_data)
+						vim.notify("Parser added complete mark " .. current_mark, 
+							vim.log.levels.DEBUG, { title = "marko.nvim" })
+					end
+				end
 			elseif current_dir and line:match("^%s*-%s") then
-				-- This is a mark entry
+				-- Handle old-style mark entries for backward compatibility
 				local mark, value = line:match("^%s*-%s+([^:]+):%s*(.+)$")
 				if mark and value then
-					-- Try to convert value to number if possible
+					-- Legacy single-line mark entry
 					local num_value = tonumber(value)
 					if num_value then
 						value = num_value
 					end
 					
-					-- Add to current directory's marks
-					table.insert(result[current_dir], { [mark] = value })
+					table.insert(result[current_dir], {
+						mark = mark,
+						row = value,
+						col = 0,
+						buffer = 0,
+						filename = ""
+					})
 					
-					-- Debug mark found
-					vim.notify("Parser found mark " .. mark .. " in dir " .. current_dir, 
+					vim.notify("Parser found legacy format mark: " .. mark, 
 						vim.log.levels.DEBUG, { title = "marko.nvim" })
 				end
 			end
@@ -118,7 +172,7 @@ function M.parse_config(content)
 	-- Debug summary of parsing results
 	for dir, dir_marks in pairs(result) do
 		vim.notify("Parser: Dir '" .. dir .. "' has " .. #dir_marks .. " marks", 
-			vim.log.levels.WARN, { title = "marko.nvim" })
+			vim.log.levels.DEBUG, { title = "marko.nvim" })
 	end
 	
 	return result
@@ -185,7 +239,12 @@ function M.generate_config(cwd, marks_to_save)
 	local base_config = cwd .. ":\n"
 	for _, mark in ipairs(marks_to_save) do
 		local content = vim.api.nvim_get_mark(mark, {})
-		base_config = base_config .. "  - " .. mark .. ": " .. content[1] .. "\n"
+		base_config = base_config .. "  - mark: \"" .. mark .. "\"\n"
+		base_config = base_config .. "    data:\n"
+		base_config = base_config .. "      row: " .. content[1] .. "\n"
+		base_config = base_config .. "      col: " .. content[2] .. "\n"
+		base_config = base_config .. "      buffer: " .. content[3] .. "\n"
+		base_config = base_config .. "      filename: \"" .. (content[4] or "") .. "\"\n"
 	end
 	return base_config
 end
@@ -193,271 +252,167 @@ end
 -- Generate a YAML string from a Lua table - separate function for clarity
 function M.generate_yaml_from_config(config_table)
 	local yaml_content = ""
-
+	
 	if type(config_table) ~= "table" then
 		return yaml_content
 	end
-
+	
 	-- Go through each directory in the config
 	for dir, dir_marks in pairs(config_table) do
 		if dir and type(dir_marks) == "table" then
 			yaml_content = yaml_content .. dir .. ":\n"
-
+			
 			-- Go through each mark in the directory
 			for _, mark_data in ipairs(dir_marks) do
-				for mark_key, mark_value in pairs(mark_data) do
-					yaml_content = yaml_content .. "  - " .. mark_key .. ": " .. mark_value .. "\n"
-				end
+				-- Use new format with mark: and data: sections
+				yaml_content = yaml_content .. "  - mark: \"" .. mark_data.mark .. "\"\n"
+				yaml_content = yaml_content .. "    data:\n"
+				yaml_content = yaml_content .. "      row: " .. mark_data.row .. "\n"
+				yaml_content = yaml_content .. "      col: " .. mark_data.col .. "\n"
+				yaml_content = yaml_content .. "      buffer: " .. mark_data.buffer .. "\n"
+				yaml_content = yaml_content .. "      filename: \"" .. mark_data.filename .. "\"\n"
 			end
 		end
 	end
-
+	
 	return yaml_content
 end
 
 -- Updates an existing config with a new directory and marks
 function M.update_config(existing_config, cwd, marks_to_save)
-	-- Important debugging
-	vim.notify("DEBUG update_config - Input existing_config: " .. vim.inspect(existing_config), vim.log.levels.DEBUG)
-
-	-- Validate input
+	-- Validate input and ensure existing_config is a table
 	if type(existing_config) ~= "table" then
 		existing_config = {}
-		vim.notify("DEBUG update_config - Invalid config type, initializing empty table", vim.log.levels.DEBUG)
 	end
-
-	-- Make a deep copy to avoid modifying the original table
+	
+	-- Create a copy of the existing config to preserve data from other directories
 	local updated_config = vim.deepcopy(existing_config)
-	vim.notify("DEBUG update_config - After deepcopy: " .. vim.inspect(updated_config), vim.log.levels.DEBUG)
-
-	-- Make sure the directory entry exists in the config
+	
+	-- Ensure the current directory exists in the config
 	if not updated_config[cwd] then
 		updated_config[cwd] = {}
-		vim.notify("DEBUG update_config - Adding new directory to config: " .. cwd, vim.log.levels.DEBUG)
 	end
-
-	-- Prepare for storing the current marks for this directory
-	local dir_marks = {}
-
-	-- Add the marks for this directory
+	
+	-- Create a set of marks to be saved for fast lookup
+	local mark_set = {}
+	for _, mark in ipairs(marks_to_save) do
+		mark_set[mark] = true
+	end
+	
+	-- Remove only entries for marks that are being updated in this directory
+	local filtered_marks = {}
+	for _, mark_entry in ipairs(updated_config[cwd]) do
+		local should_keep = true
+		if mark_entry.mark and mark_set[mark_entry.mark] then
+			should_keep = false
+		end
+		if should_keep then
+			table.insert(filtered_marks, mark_entry)
+		end
+	end
+	
+	-- Update with filtered marks
+	updated_config[cwd] = filtered_marks
+	
+	-- Add the current marks for this directory
 	for _, mark in ipairs(marks_to_save) do
 		local content = vim.api.nvim_get_mark(mark, {})
 		if content and content[1] then
 			local line_number = content[1]
-			table.insert(dir_marks, { [mark] = line_number })
+			table.insert(updated_config[cwd], {
+				mark = mark,
+				row = content[1],
+				col = content[2],
+				buffer = content[3],
+				filename = content[4] or ""
+			})
 		end
 	end
-
-	-- Update just this directory with the new marks
-	updated_config[cwd] = dir_marks
-
-	vim.notify(
-		"DEBUG update_config - Final config before YAML generation: " .. vim.inspect(updated_config),
-		vim.log.levels.DEBUG
-	)
-
-	-- Use the dedicated function to generate YAML
-	local yaml_content = M.generate_yaml_from_config(updated_config)
-
-	vim.notify("DEBUG update_config - Final YAML content: " .. yaml_content, vim.log.levels.DEBUG)
-
-	return yaml_content
+	
+	-- Generate YAML string
+	return M.generate_yaml_from_config(updated_config)
 end
 
--- Save directory marks to config file - FIXED VERSION TO PRESERVE OTHER DIRECTORIES
+-- Save directory marks to config file
 function M.save_directory_marks(config_path, directory_path)
 	local utils = require("marko.utils")
 	directory_path = directory_path or vim.fn.getcwd()
-
-	vim.notify("Saving marks for directory: " .. directory_path, vim.log.levels.INFO, { title = "marko.nvim" })
-
-	-- Step 1: Create the directory structure if needed
-	if not M.check_path(config_path) then
+	
+	-- Debug information
+	vim.notify("DEBUG saving marks for directory: " .. directory_path, vim.log.levels.DEBUG, { title = "marko.nvim" })
+	
+	-- Step 1: Ensure config file exists
+	local exists = M.check_path(config_path)
+	if not exists then
+		-- Create config file first
 		local success, err = M.create_path(config_path)
 		if not success then
-			vim.notify("Failed to create config path: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
+			vim.notify("Error creating config file path: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
+			return nil, err
+		end
+		
+		-- Initialize with empty content
+		local success, err = M.write_file(config_path, "")
+		if not success then
+			vim.notify("Error initializing config file: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
 			return nil, err
 		end
 	end
-
-	-- Step 2: Read and parse existing config
-	local config_data = {}
-	local content = M.read_file(config_path)
-
-	-- Super verbose debug on the raw content
-	vim.notify("RAW CONFIG CONTENT: " .. vim.inspect(content), vim.log.levels.ERROR, { title = "marko.nvim" })
-
+	
+	-- Step 2: Read existing config
+	local content, err = M.read_file(config_path)
+	if not content then
+		vim.notify(
+			"Error reading config file: " .. (err or "unknown error"),
+			vim.log.levels.ERROR,
+			{ title = "marko.nvim" }
+		)
+		return nil, err
+	end
+	
+	-- Debug
+	vim.notify("DEBUG raw config content: " .. content, vim.log.levels.DEBUG, { title = "marko.nvim" })
+	
+	-- Step 3: Parse the config safely
+	local parsed_config = {}
 	if content and content ~= "" then
 		local success, result = pcall(function()
 			return M.parse_config(content)
 		end)
-
-		vim.notify("PARSE RESULT SUCCESS: " .. tostring(success), vim.log.levels.ERROR, { title = "marko.nvim" })
-
-		if success and type(result) == "table" then
-			-- CRITICAL: Deep copy to ensure no references
-			config_data = vim.deepcopy(result)
-
-			-- Debug the loaded config
-			local dir_keys = vim.tbl_keys(config_data)
-			vim.notify(
-				"LOADED CONFIG WITH " .. #dir_keys .. " DIRECTORIES: " .. table.concat(dir_keys, ", "),
-				vim.log.levels.ERROR, -- Using ERROR level to make it more visible in logs
-				{ title = "marko.nvim" }
-			)
-
-			-- Debug each directory's marks to see exactly what we have
-			for dir, marks in pairs(config_data) do
-				vim.notify(
-					"DIRECTORY '" .. dir .. "' HAS " .. #marks .. " MARKS",
-					vim.log.levels.ERROR,
-					{ title = "marko.nvim" }
-				)
-			end
+		
+		if success and result and type(result) == "table" then
+			parsed_config = result
 		else
 			vim.notify(
-				"!!! PARSE FAILED !!!: " .. (type(result) == "string" and result or "unknown error"),
-				vim.log.levels.ERROR,
-				{ title = "marko.nvim" }
-			)
-			config_data = {}
-		end
-	else
-		vim.notify("EMPTY CONFIG CONTENT", vim.log.levels.ERROR, { title = "marko.nvim" })
-	end
-
-	-- Step 3: Get the current directory's marks
-	local curr_marks = M.filter_marks(directory_path)
-	local dir_marks = {}
-	
-	-- Show which directory we're processing
-	vim.notify(
-		"Processing directory: " .. directory_path,
-		vim.log.levels.WARN,
-		{ title = "marko.nvim" }
-	)
-	
-	-- Process each mark
-	for _, mark in ipairs(curr_marks) do
-		local mark_data = vim.api.nvim_get_mark(mark, {})
-		if mark_data then
-			local line_num = mark_data[1]
-			local col_num = mark_data[2]
-			local filename = mark_data[4] or "unknown"
-			
-			-- Print full mark details for debugging
-			vim.notify(
-				"Mark " .. mark .. ": line=" .. tostring(line_num) .. ", col=" .. tostring(col_num) .. ", file=" .. filename,
+				"Warning: Failed to parse config, starting fresh",
 				vim.log.levels.WARN,
 				{ title = "marko.nvim" }
 			)
-			
-			-- Only add valid marks
-			if line_num and line_num > 0 then
-				table.insert(dir_marks, { [mark] = line_num })
-			end
 		end
 	end
-
-	-- BEFORE: Check what's in config_data before we make changes
-	vim.notify(
-		"BEFORE UPDATE - CONFIG DATA HAS " .. #vim.tbl_keys(config_data) .. " DIRECTORIES",
-		vim.log.levels.ERROR,
-		{ title = "marko.nvim" }
-	)
-
-	-- Step 4: Update just the current directory in the config
-	-- Only update if we actually have marks
-	if #curr_marks > 0 then
-		config_data[directory_path] = dir_marks
-		vim.notify(
-			"Updating directory with " .. #dir_marks .. " marks",
-			vim.log.levels.WARN,
-			{ title = "marko.nvim" }
-		)
-	else
-		-- Ensure the directory exists but don't overwrite existing marks
-		if not config_data[directory_path] then
-			config_data[directory_path] = {}
-		end
-	end
-
-	-- AFTER: Check what's in config_data after we make changes
-	vim.notify(
-		"AFTER UPDATE - CONFIG DATA HAS "
-			.. #vim.tbl_keys(config_data)
-			.. " DIRECTORIES: "
-			.. table.concat(vim.tbl_keys(config_data), ", "),
-		vim.log.levels.ERROR,
-		{ title = "marko.nvim" }
-	)
-
-	-- Step 5: Convert config to YAML format
-	local lines = {}
-
-	-- Sort the directories for consistent output
-	local sorted_dirs = {}
-	for dir, _ in pairs(config_data) do
-		table.insert(sorted_dirs, dir)
-	end
-	table.sort(sorted_dirs)
-
-	-- Process each directory in sorted order
-	for _, dir in ipairs(sorted_dirs) do
-		local config_marks = config_data[dir]
-
-		-- Add a blank line between directories for better readability
-		if #lines > 0 then
-			table.insert(lines, "")
-		end
-
-		table.insert(lines, dir .. ":")
-		if type(config_marks) == "table" and #config_marks > 0 then
-			for _, mark_entry in ipairs(config_marks) do
-				for mark_key, mark_value in pairs(mark_entry) do
-					table.insert(lines, "  - " .. mark_key .. ": " .. mark_value)
-				end
-			end
-		else
-			-- Better formatting for empty directories
-			table.insert(lines, "  # No marks for this directory")
-		end
-	end
-
-	local yaml_content = table.concat(lines, "\n") .. "\n"
-
-	-- Debug the final YAML content
-	vim.notify("FINAL YAML CONTENT:\n" .. yaml_content, vim.log.levels.ERROR, { title = "marko.nvim" })
-
-	-- Step 6: Write to file
-	local success, err = M.write_file(config_path, yaml_content)
+	
+	-- Debug
+	vim.notify("DEBUG parsed config: " .. vim.inspect(parsed_config), vim.log.levels.DEBUG, { title = "marko.nvim" })
+	
+	-- Step 4: Get current marks for this directory
+	local curr_marks = M.filter_marks(directory_path)
+	
+	-- Step 5: Update the config with current directory marks while preserving other directories
+	local updated_content = M.update_config(parsed_config, directory_path, curr_marks)
+	
+	-- Debug
+	vim.notify("DEBUG updated YAML content: " .. updated_content, vim.log.levels.DEBUG, { title = "marko.nvim" })
+	
+	-- Step 6: Write the updated config back to file
+	local success, err = M.write_file(config_path, updated_content)
 	if not success then
-		vim.notify("Failed to write config: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
+		vim.notify("Error saving directory marks: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
 		return nil, err
 	end
-
-	-- Try to read back the file and parse it to verify we're saving correctly
-	local saved_content = M.read_file(config_path)
-	if saved_content then
-		local parsed_saved, result = pcall(function()
-			return M.parse_config(saved_content)
-		end)
-		if parsed_saved and result then
-			local saved_dirs = vim.tbl_keys(result)
-			vim.notify(
-				"VERIFICATION - SAVED CONFIG HAS " .. #saved_dirs .. " DIRECTORIES: " .. table.concat(saved_dirs, ", "),
-				vim.log.levels.ERROR,
-				{ title = "marko.nvim" }
-			)
-		end
-	end
-
-	vim.notify(
-		"Successfully saved marks for directory: " .. directory_path,
-		vim.log.levels.INFO,
-		{ title = "marko.nvim" }
-	)
-	return config_data
+	
+	-- Return the updated parsed config
+	local new_config = M.parse_config(updated_content)
+	return new_config
 end
 
 function M.get_config(path)

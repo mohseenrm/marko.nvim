@@ -15,19 +15,9 @@ for i = 65, 90 do
 end
 
 function M.filter_marks(project_path)
-	-- enumerate over marks, check if valid and if starts with project_path
-	local filtered_marks = {}
-	for _, mark in ipairs(marks) do
-		local content = vim.api.nvim_get_mark(mark, {})
-		local mark_path = content[4]
-		local valid = mark_path ~= ""
-		local in_project = mark_path:match(project_path) ~= nil
-
-		if valid and in_project then
-			table.insert(filtered_marks, mark)
-		end
-	end
-	return filtered_marks
+	-- This function is no longer used, delegating to file.filter_marks instead
+	-- Keeping for backward compatibility
+	return file.filter_marks(project_path)
 end
 
 -- iterate over marks, skips mark if part of table skip, else calls vim.api.nvim_del_mark
@@ -45,8 +35,13 @@ function M.save_current_marks()
 	local cwd = vim.fn.getcwd()
 	vim.notify("Saving marks for: " .. cwd, vim.log.levels.INFO, { title = "marko.nvim" })
 
-	-- Use our improved filter_marks function to get current marks
+	-- IMPORTANT: Use the file.lua implementation of filter_marks since it's more robust
 	local curr_marks = file.filter_marks(cwd)
+	vim.notify(
+		"Found " .. #curr_marks .. " marks for project using file.filter_marks",
+		vim.log.levels.WARN,
+		{ title = "marko.nvim" }
+	)
 
 	-- Debug what we found
 	if #curr_marks > 0 then
@@ -60,63 +55,22 @@ function M.save_current_marks()
 			end
 		end
 
-		-- Use the cached config if available, otherwise start with empty
-		local current_config = config_cache or {}
+		-- Call file.save_directory_marks directly which will handle the saving
+		local result, err = file.save_directory_marks(marks_path, cwd)
 
-		-- Update only this directory's marks
-		local dir_marks = {}
-		for _, mark in ipairs(curr_marks) do
-			local content = vim.api.nvim_get_mark(mark, {})
-			if content and content[1] then
-				table.insert(dir_marks, { [mark] = content[1] })
-			end
-		end
-
-		-- Update just this directory
-		current_config[cwd] = dir_marks
-
-		-- Generate YAML content manually to ensure correct format
-		local yaml_lines = {}
-		local sorted_dirs = vim.tbl_keys(current_config)
-		table.sort(sorted_dirs)
-
-		for i, dir in ipairs(sorted_dirs) do
-			-- Add spacing between directories
-			if i > 1 then
-				table.insert(yaml_lines, "")
-			end
-
-			local marks = current_config[dir]
-			table.insert(yaml_lines, dir .. ":")
-
-			if marks and #marks > 0 then
-				for _, mark_entry in ipairs(marks) do
-					for mark_key, mark_value in pairs(mark_entry) do
-						table.insert(yaml_lines, "  - " .. mark_key .. ": " .. mark_value)
-					end
-				end
-			else
-				table.insert(yaml_lines, "  # No marks for this directory")
-			end
-		end
-
-		-- Generate the YAML string and write to file
-		local yaml_content = table.concat(yaml_lines, "\n") .. "\n"
-		local success, err = file.write_file(marks_path, yaml_content)
-
-		if success then
-			-- Update cache
-			config_cache = current_config
+		if result then
+			-- Update our local cache with the result from file.save_directory_marks
+			config_cache = result
 
 			vim.notify(
-				"Successfully saved " .. #dir_marks .. " marks for " .. cwd,
+				"Successfully saved marks for " .. cwd .. " using file.save_directory_marks",
 				vim.log.levels.INFO,
 				{ title = "marko.nvim" }
 			)
 			return true
 		else
 			vim.notify(
-				"Error writing config: " .. (err or "unknown error"),
+				"Error saving marks: " .. (err or "unknown error"),
 				vim.log.levels.ERROR,
 				{ title = "marko.nvim" }
 			)
@@ -124,39 +78,6 @@ function M.save_current_marks()
 		end
 	else
 		vim.notify("No marks found to save", vim.log.levels.WARN, { title = "marko.nvim" })
-
-		-- If no marks, still make sure directory exists in config
-		if config_cache and not config_cache[cwd] then
-			config_cache[cwd] = {}
-
-			-- Generate YAML manually
-			local yaml_lines = {}
-			local sorted_dirs = vim.tbl_keys(config_cache)
-			table.sort(sorted_dirs)
-
-			for i, dir in ipairs(sorted_dirs) do
-				if i > 1 then
-					table.insert(yaml_lines, "")
-				end
-
-				local marks = config_cache[dir]
-				table.insert(yaml_lines, dir .. ":")
-
-				if marks and #marks > 0 then
-					for _, mark_entry in ipairs(marks) do
-						for mark_key, mark_value in pairs(mark_entry) do
-							table.insert(yaml_lines, "  - " .. mark_key .. ": " .. mark_value)
-						end
-					end
-				else
-					table.insert(yaml_lines, "  # No marks for this directory")
-				end
-			end
-
-			local yaml_content = table.concat(yaml_lines, "\n") .. "\n"
-			file.write_file(marks_path, yaml_content)
-		end
-
 		return false
 	end
 end
@@ -191,8 +112,7 @@ end
 function M.setup()
 	-- Create user command to manually save marks
 	vim.api.nvim_create_user_command("MarkoSave", function()
-		-- Always reload config first to ensure we have the latest state
-		M.load_full_config()
+		-- Skip reloading config to avoid overwriting marks
 		M.save_current_marks()
 	end, { desc = "Save marks for current directory" })
 
@@ -216,8 +136,7 @@ function M.setup()
 	-- Save marks when Neovim exits
 	vim.api.nvim_create_autocmd("VimLeavePre", {
 		callback = function()
-			-- Always reload config first to ensure we have latest state
-			M.load_full_config()
+			-- DON'T reload config before saving to avoid losing marks
 			M.save_current_marks()
 		end,
 	})
@@ -229,8 +148,7 @@ function M.setup()
 			-- Only save once every 5 seconds at most
 			local current_time = os.time()
 			if current_time - last_save_time >= 5 then
-				-- Always reload config first
-				M.load_full_config()
+				-- DON'T reload config before saving to avoid losing marks
 				M.save_current_marks()
 
 				-- Update last save time
