@@ -119,7 +119,7 @@ function M.get_config(path)
 
 		print(content)
 		local test = M.parse_config(content)
-		print("TEST: " .. test)
+		print("TEST: " .. vim.inspect(test))
 		return content
 	else
 		-- path does not exist
