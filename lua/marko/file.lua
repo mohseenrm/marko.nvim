@@ -11,16 +11,53 @@ end
 function M.filter_marks(project_path)
 	-- enumerate over marks, check if valid and if starts with project_path
 	local filtered_marks = {}
+	
+	-- Debug the project path we're filtering for
+	vim.notify("Filtering marks for project: " .. project_path, 
+		vim.log.levels.WARN, { title = "marko.nvim" })
+	
 	for _, mark in ipairs(marks) do
 		local content = vim.api.nvim_get_mark(mark, {})
-		local mark_path = content[4]
-		local valid = mark_path ~= ""
-		local in_project = mark_path:match(project_path) ~= nil
+		local mark_path = content[4] or ""
+		
+		-- More detailed validation
+		local valid = mark_path ~= "" and mark_path ~= nil
+		local in_project = false
+		
+		if valid then
+			-- Debug the mark path
+			vim.notify("Checking mark " .. mark .. " with path: " .. mark_path, 
+				vim.log.levels.DEBUG, { title = "marko.nvim" })
+				
+			-- Try different ways to match the project path
+			-- Simple string prefix check (most reliable for nested paths)
+			if string.sub(mark_path, 1, #project_path) == project_path then
+				in_project = true
+				vim.notify("PREFIX MATCH for " .. mark .. ": " .. mark_path .. " starts with " .. project_path,
+					vim.log.levels.WARN, { title = "marko.nvim" })
+			-- Standard Lua pattern match for path
+			elseif mark_path:match("^" .. project_path) then
+				in_project = true 
+				vim.notify("PATTERN MATCH for " .. mark .. ": " .. mark_path .. " matches pattern ^" .. project_path,
+					vim.log.levels.WARN, { title = "marko.nvim" })
+			-- Fallback to more relaxed matching
+			elseif mark_path:find(project_path, 1, true) then
+				in_project = true
+				vim.notify("FIND MATCH for " .. mark .. ": " .. mark_path .. " contains " .. project_path,
+					vim.log.levels.WARN, { title = "marko.nvim" })
+			end
+		end
 
 		if valid and in_project then
+			vim.notify("Mark " .. mark .. " MATCHES project: " .. project_path, 
+				vim.log.levels.WARN, { title = "marko.nvim" })
 			table.insert(filtered_marks, mark)
 		end
 	end
+	
+	vim.notify("Found " .. #filtered_marks .. " marks for project: " .. project_path, 
+		vim.log.levels.WARN, { title = "marko.nvim" })
+		
 	return filtered_marks
 end
 
@@ -40,21 +77,23 @@ function M.parse_config(content)
 		table.insert(lines, line)
 	end
 	
-	for _, line in ipairs(lines) do
+	for i, line in ipairs(lines) do
 		-- Skip empty lines
 		if line:match("^%s*$") then
-			-- Skip empty lines
+			-- Skip empty lines, but preserve current directory context
 		elseif line:match("^%s*#") then
-			-- Skip comments
+			-- Skip comments, but preserve current directory context
 		else
 			-- Check if this is a directory line (ends with colon)
 			local dir = line:match("^([^:]+):$")
 			if dir then
 				-- Found a new directory
 				current_dir = dir
-				if not result[current_dir] then
-					result[current_dir] = {}
-				end
+				result[current_dir] = result[current_dir] or {}
+				
+				-- Debug new directory found
+				vim.notify("Parser found directory: " .. current_dir, 
+					vim.log.levels.WARN, { title = "marko.nvim" })
 			elseif current_dir and line:match("^%s*-%s") then
 				-- This is a mark entry
 				local mark, value = line:match("^%s*-%s+([^:]+):%s*(.+)$")
@@ -67,13 +106,20 @@ function M.parse_config(content)
 					
 					-- Add to current directory's marks
 					table.insert(result[current_dir], { [mark] = value })
+					
+					-- Debug mark found
+					vim.notify("Parser found mark " .. mark .. " in dir " .. current_dir, 
+						vim.log.levels.DEBUG, { title = "marko.nvim" })
 				end
 			end
 		end
 	end
 	
-	vim.notify("CUSTOM PARSER FOUND " .. vim.inspect(vim.tbl_count(result)) .. " DIRECTORIES", 
-		vim.log.levels.ERROR, { title = "marko.nvim" })
+	-- Debug summary of parsing results
+	for dir, dir_marks in pairs(result) do
+		vim.notify("Parser: Dir '" .. dir .. "' has " .. #dir_marks .. " marks", 
+			vim.log.levels.WARN, { title = "marko.nvim" })
+	end
 	
 	return result
 end
@@ -283,11 +329,33 @@ function M.save_directory_marks(config_path, directory_path)
 	-- Step 3: Get the current directory's marks
 	local curr_marks = M.filter_marks(directory_path)
 	local dir_marks = {}
-
+	
+	-- Show which directory we're processing
+	vim.notify(
+		"Processing directory: " .. directory_path,
+		vim.log.levels.WARN,
+		{ title = "marko.nvim" }
+	)
+	
+	-- Process each mark
 	for _, mark in ipairs(curr_marks) do
 		local mark_data = vim.api.nvim_get_mark(mark, {})
-		if mark_data and mark_data[1] then
-			table.insert(dir_marks, { [mark] = mark_data[1] })
+		if mark_data then
+			local line_num = mark_data[1]
+			local col_num = mark_data[2]
+			local filename = mark_data[4] or "unknown"
+			
+			-- Print full mark details for debugging
+			vim.notify(
+				"Mark " .. mark .. ": line=" .. tostring(line_num) .. ", col=" .. tostring(col_num) .. ", file=" .. filename,
+				vim.log.levels.WARN,
+				{ title = "marko.nvim" }
+			)
+			
+			-- Only add valid marks
+			if line_num and line_num > 0 then
+				table.insert(dir_marks, { [mark] = line_num })
+			end
 		end
 	end
 
@@ -299,7 +367,20 @@ function M.save_directory_marks(config_path, directory_path)
 	)
 
 	-- Step 4: Update just the current directory in the config
-	config_data[directory_path] = dir_marks
+	-- Only update if we actually have marks
+	if #curr_marks > 0 then
+		config_data[directory_path] = dir_marks
+		vim.notify(
+			"Updating directory with " .. #dir_marks .. " marks",
+			vim.log.levels.WARN,
+			{ title = "marko.nvim" }
+		)
+	else
+		-- Ensure the directory exists but don't overwrite existing marks
+		if not config_data[directory_path] then
+			config_data[directory_path] = {}
+		end
+	end
 
 	-- AFTER: Check what's in config_data after we make changes
 	vim.notify(
@@ -331,14 +412,15 @@ function M.save_directory_marks(config_path, directory_path)
 		end
 
 		table.insert(lines, dir .. ":")
-		if #config_marks > 0 then
+		if type(config_marks) == "table" and #config_marks > 0 then
 			for _, mark_entry in ipairs(config_marks) do
 				for mark_key, mark_value in pairs(mark_entry) do
 					table.insert(lines, "  - " .. mark_key .. ": " .. mark_value)
 				end
 			end
 		else
-			table.insert(lines, "  # No marks")
+			-- Better formatting for empty directories
+			table.insert(lines, "  # No marks for this directory")
 		end
 	end
 
@@ -383,6 +465,9 @@ function M.get_config(path)
 	local res = M.check_path(path)
 	local cwd = vim.fn.getcwd()
 	local utils = require("marko.utils")
+	
+	vim.notify("Getting config for current directory: " .. cwd, 
+		vim.log.levels.WARN, { title = "marko.nvim" })
 
 	-- path does exist
 	if res then
@@ -391,20 +476,53 @@ function M.get_config(path)
 
 		if not content or content == "" then
 			-- Empty or invalid file, create a new one with current directory marks
+			vim.notify("Empty config file, creating new one", 
+				vim.log.levels.WARN, { title = "marko.nvim" })
 			return M.save_directory_marks(path, cwd)
 		end
 
 		local parsed_config = M.parse_config(content)
+		
+		-- Debug what we found in the config
+		local config_dirs = vim.tbl_keys(parsed_config)
+		vim.notify("Found " .. #config_dirs .. " directories in config", 
+			vim.log.levels.WARN, { title = "marko.nvim" })
+			
+		-- Check each directory and its marks count
+		for dir, dir_marks in pairs(parsed_config) do
+			vim.notify("Config dir: " .. dir .. " has " .. #dir_marks .. " marks", 
+				vim.log.levels.WARN, { title = "marko.nvim" })
+		end
 
 		-- Check if current directory exists in config
 		if not utils.get(parsed_config, cwd) then
 			-- Directory doesn't exist in config, add it
+			vim.notify("Current directory not in config, adding: " .. cwd, 
+				vim.log.levels.WARN, { title = "marko.nvim" })
 			return M.save_directory_marks(path, cwd)
+		end
+		
+		-- Check if we have marks for this directory
+		local current_dir_marks = parsed_config[cwd]
+		if current_dir_marks and #current_dir_marks == 0 then
+			-- Directory exists but has no marks
+			vim.notify("Directory exists but has no marks: " .. cwd, 
+				vim.log.levels.WARN, { title = "marko.nvim" })
+			
+			-- Check if we have actual marks for this directory
+			local actual_marks = M.filter_marks(cwd)
+			if #actual_marks > 0 then
+				vim.notify("Found " .. #actual_marks .. " marks to add to " .. cwd, 
+					vim.log.levels.WARN, { title = "marko.nvim" })
+				return M.save_directory_marks(path, cwd)
+			end
 		end
 
 		return parsed_config
 	else
 		-- Path does not exist, create it and save current directory marks
+		vim.notify("Config file doesn't exist, creating new one", 
+			vim.log.levels.WARN, { title = "marko.nvim" })
 		return M.save_directory_marks(path, cwd)
 	end
 end
