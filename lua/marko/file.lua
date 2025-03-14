@@ -11,16 +11,16 @@ function M.check_path(path)
 end
 
 function M.create_path(path)
-  local parent = path:match("(.*/)")
+	local parent = path:match("(.*/)")
 	local mkdir_cmd = string.format("mkdir -p %s", parent)
-  
+
 	local result = os.execute(mkdir_cmd)
 	if result ~= 0 then
 		return nil, "Failed to create path, err: " .. result
 	end
 
-  local touch_cmd = string.format("touch %s", path)
-  local result = os.execute(touch_cmd)
+	local touch_cmd = string.format("touch %s", path)
+	local result = os.execute(touch_cmd)
 
 	if result ~= 0 then
 		return nil, "Failed to create path, err: " .. result
@@ -61,7 +61,7 @@ function M.get_config(path)
 	-- create marks path if does not exist, create new file and save content for cwd
 	local res = M.check_path(path)
 	local cwd = vim.fn.getcwd()
-  -- print("TEST: " .. test)
+	-- print("TEST: " .. test)
 	local base_config = [[
 ]] .. cwd .. [[:
   - A: mark content
@@ -81,10 +81,12 @@ function M.get_config(path)
 		end
 
 		print(content)
-    config.setup()
-    return base_config
+		config.setup()
+		return base_config
 	else
 		-- path does not exist
+		print("CREATING CONFIG")
+		print("CWD: " .. cwd)
 		local success, err = M.create_path(path)
 
 		if not success then
@@ -92,14 +94,21 @@ function M.get_config(path)
 			return nil, err
 		end
 
-		local success, err = M.write_file(path, base_config)
+		-- process: create config, filter marks, write filtered marks to file, delete + filter global marks
+		local filtered_marks = config.filter_marks(cwd)
+		config.del_marks(filtered_marks)
+		local gen_config = config.generate_config(cwd, filtered_marks)
+
+		print("FILTERED_CONFIG: " .. vim.inspect(filtered_marks))
+
+		local success, err = M.write_file(path, gen_config)
 
 		if not success then
 			vim.notify("Error creating file" .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
 			return nil, err
 		end
 
-    config.setup()
+		config.setup()
 		return base_config
 	end
 
