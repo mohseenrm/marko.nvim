@@ -94,59 +94,122 @@ function M.generate_config(cwd, marks_to_save)
 	return base_config
 end
 
+-- Updates an existing config with a new directory and marks
+function M.update_config(existing_config, cwd, marks_to_save)
+	-- Create a copy of the existing config
+	local updated_config = vim.deepcopy(existing_config)
+
+	-- Always replace the directory's marks with the current ones
+	updated_config[cwd] = {}
+
+	-- Add all marks for this directory
+	for _, mark in ipairs(marks_to_save) do
+		local content = vim.api.nvim_get_mark(mark, {})
+		local line_number = content[1]
+		table.insert(updated_config[cwd], { [mark] = line_number })
+	end
+
+	-- Convert back to YAML format
+	local yaml_content = ""
+	for dir, curr_marks in pairs(updated_config) do
+		print("DEBUG: dir: " .. vim.inspect(dir))
+		print("DEBUG: curr_marks: " .. vim.inspect(curr_marks))
+		yaml_content = yaml_content .. dir .. ":\n"
+		for _, mark_data in ipairs(curr_marks) do
+			for mark_key, mark_value in pairs(mark_data) do
+				yaml_content = yaml_content .. "  - " .. mark_key .. ": " .. mark_value .. "\n"
+			end
+		end
+	end
+
+	return yaml_content
+end
+
+-- Save directory marks to config file
+function M.save_directory_marks(config_path, directory_path)
+	local utils = require("marko.utils")
+	directory_path = directory_path or vim.fn.getcwd()
+
+	-- Check if config file exists
+	local exists = M.check_path(config_path)
+	if not exists then
+		-- Create config file first
+		local success, err = M.create_path(config_path)
+		if not success then
+			vim.notify("Error creating config file path: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
+			return nil, err
+		end
+
+		-- Write initial empty config
+		local success, err = M.write_file(config_path, "")
+		if not success then
+			vim.notify("Error initializing config file: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
+			return nil, err
+		end
+	end
+
+	-- Read and parse existing config
+	local content, err = M.read_file(config_path)
+	if not content then
+		vim.notify(
+			"Error reading config file: " .. (err or "unknown error"),
+			vim.log.levels.ERROR,
+			{ title = "marko.nvim" }
+		)
+		return nil, err
+	end
+
+	-- Parse the config (even if empty)
+	local parsed_config = {}
+	if content ~= "" then
+		parsed_config = M.parse_config(content)
+	end
+
+	-- Get marks for the directory
+	local marks = M.filter_marks(directory_path)
+
+	-- Update the config with current directory marks
+	local updated_content = M.update_config(parsed_config, directory_path, marks)
+
+	-- Write the updated config back to file
+	local success, err = M.write_file(config_path, updated_content)
+	if not success then
+		vim.notify("Error saving directory marks: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
+		return nil, err
+	end
+
+	-- Return the updated parsed config
+	return M.parse_config(updated_content)
+end
+
 function M.get_config(path)
 	-- create marks path if does not exist, create new file and save content for cwd
 	local res = M.check_path(path)
 	local cwd = vim.fn.getcwd()
-	-- print("TEST: " .. test)
-	local base_config = [[
-]] .. cwd .. [[:
-  - A: mark content
-  - B: mark content
-]]
+	local utils = require("marko.utils")
 
 	-- path does exist
 	if res then
 		-- read and parse content
 		local content, err = M.read_file(path)
-		-- print("HERE 1" .. err)
 
-		if not content then
-			local success, err = M.write_file(path, base_config)
-			vim.notify("Error parsing mark content" .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
-			return nil, err
+		if not content or content == "" then
+			-- Empty or invalid file, create a new one with current directory marks
+			return M.save_directory_marks(path, cwd)
 		end
 
-		print(content)
-		local parse_config = M.parse_config(content)
-		print("TEST: " .. vim.inspect(parse_config))
-		return parse_config
-	else
-		-- path does not exist
-		print("CREATING CONFIG")
-		print("CWD: " .. cwd)
-		local success, err = M.create_path(path)
+		local parsed_config = M.parse_config(content)
 
-		if not success then
-			vim.notify("Error creating file path" .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
-			return nil, err
+		-- Check if current directory exists in config
+		if not utils.get(parsed_config, cwd) then
+			-- Directory doesn't exist in config, add it
+			return M.save_directory_marks(path, cwd)
 		end
 
-		-- process: create config, filter marks, write filtered marks to file, delete + filter global marks
-		local filtered_marks = M.filter_marks(cwd)
-		print("FILTERED_MARKS 1: " .. vim.inspect(filtered_marks))
-		-- config.del_marks(filtered_marks)
-		local gen_config = M.generate_config(cwd, filtered_marks)
-
-		local success, err = M.write_file(path, gen_config)
-
-		if not success then
-			vim.notify("Error creating file" .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
-			return nil, err
-		end
-
-		local parsed_config = M.parse_config(gen_config)
 		return parsed_config
+	else
+		-- Path does not exist, create it and save current directory marks
+		return M.save_directory_marks(path, cwd)
 	end
 end
 

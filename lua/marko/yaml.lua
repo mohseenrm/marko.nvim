@@ -106,7 +106,7 @@ end
 function M.eval(content)
 	local tokens = M.tokenize(content)
 	local result = {}
-	local stack = { result }
+	local stack = { { table = result, key = nil } }
 	local levels = { 0 }
 	local current_level = 0
 	local current_table = result
@@ -121,8 +121,8 @@ function M.eval(content)
 				-- New indentation level
 				current_level = token.indent
 				local new_table = {}
-				current_table[stack[#stack].last_key] = new_table
-				table.insert(stack, { table = new_table, last_key = nil })
+				current_table[stack[#stack].key] = new_table
+				table.insert(stack, { table = new_table, key = nil })
 				table.insert(levels, current_level)
 				current_table = new_table
 				list_mode = false
@@ -139,18 +139,18 @@ function M.eval(content)
 
 			if token.value == "" then
 				-- Key with empty value (will be a table)
-				stack[#stack].last_key = token.key
+				stack[#stack].key = token.key
 				current_table[token.key] = {}
 			else
 				-- Simple key-value
 				current_table[token.key] = token.value
-				stack[#stack].last_key = token.key
+				stack[#stack].key = token.key
 			end
 		elseif token_type == "LIST_ITEM" then
 			if not list_mode then
 				-- First list item
 				list_mode = true
-				list_key = stack[#stack].last_key
+				list_key = stack[#stack].key
 				current_table[list_key] = {}
 			end
 
