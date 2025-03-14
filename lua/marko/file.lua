@@ -96,24 +96,27 @@ end
 
 -- Updates an existing config with a new directory and marks
 function M.update_config(existing_config, cwd, marks_to_save)
-	-- Create a copy of the existing config
-	local updated_config = vim.deepcopy(existing_config)
+	-- Create a copy of the existing config to preserve data from other directories
+	local updated_config = vim.deepcopy(existing_config) or {}
 
-	-- Always replace the directory's marks with the current ones
+	-- Initialize the current directory if it doesn't exist
+	if not updated_config[cwd] then
+		updated_config[cwd] = {}
+	end
+
+	-- Replace marks for this directory only
 	updated_config[cwd] = {}
 
-	-- Add all marks for this directory
+	-- Add the current marks for this directory
 	for _, mark in ipairs(marks_to_save) do
 		local content = vim.api.nvim_get_mark(mark, {})
 		local line_number = content[1]
 		table.insert(updated_config[cwd], { [mark] = line_number })
 	end
 
-	-- Convert back to YAML format
+	-- Convert back to YAML format, preserving all directories
 	local yaml_content = ""
 	for dir, curr_marks in pairs(updated_config) do
-		print("DEBUG: dir: " .. vim.inspect(dir))
-		print("DEBUG: curr_marks: " .. vim.inspect(curr_marks))
 		yaml_content = yaml_content .. dir .. ":\n"
 		for _, mark_data in ipairs(curr_marks) do
 			for mark_key, mark_value in pairs(mark_data) do
@@ -162,14 +165,26 @@ function M.save_directory_marks(config_path, directory_path)
 	-- Parse the config (even if empty)
 	local parsed_config = {}
 	if content ~= "" then
-		parsed_config = M.parse_config(content)
+		local success, result = pcall(function()
+			return M.parse_config(content)
+		end)
+
+		if success and result and type(result) == "table" then
+			parsed_config = result
+		else
+			vim.notify(
+				"Warning: Could not parse existing config, starting fresh",
+				vim.log.levels.WARN,
+				{ title = "marko.nvim" }
+			)
+		end
 	end
 
 	-- Get marks for the directory
-	local marks = M.filter_marks(directory_path)
+	local curr_marks = M.filter_marks(directory_path)
 
-	-- Update the config with current directory marks
-	local updated_content = M.update_config(parsed_config, directory_path, marks)
+	-- Update the config with current directory marks while preserving other directories
+	local updated_content = M.update_config(parsed_config, directory_path, curr_marks)
 
 	-- Write the updated config back to file
 	local success, err = M.write_file(config_path, updated_content)
@@ -179,7 +194,8 @@ function M.save_directory_marks(config_path, directory_path)
 	end
 
 	-- Return the updated parsed config
-	return M.parse_config(updated_content)
+	local new_config = M.parse_config(updated_content)
+	return new_config
 end
 
 function M.get_config(path)
