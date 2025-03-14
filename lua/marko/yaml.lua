@@ -46,11 +46,11 @@ function M.tokenize(content)
 				if key:match("^-%s") then
 					key = key:match("^-%s+(.+)$")
 				end
-				
+
 				-- Parse the value to its native type
 				local trimmed_value = value:match("^%s*(.-)%s*$")
 				local parsed_value = parse_value(trimmed_value)
-				
+
 				table.insert(tokens, {
 					"KEY_VALUE",
 					key = key,
@@ -65,7 +65,7 @@ function M.tokenize(content)
 				local item = stripped:match("^-%s+(.+)$")
 				local trimmed_item = item:match("^%s*(.-)%s*$")
 				local parsed_item = parse_value(trimmed_item)
-				
+
 				table.insert(tokens, {
 					"LIST_ITEM",
 					value = parsed_item,
@@ -202,4 +202,3 @@ function M.parse_string(yaml_string)
 end
 
 return M
-
