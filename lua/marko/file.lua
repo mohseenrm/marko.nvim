@@ -118,9 +118,9 @@ function M.get_config(path)
 		end
 
 		print(content)
-		local test = M.parse_config(content)
-		print("TEST: " .. vim.inspect(test))
-		return content
+		local parse_config = M.parse_config(content)
+		print("TEST: " .. vim.inspect(parse_config))
+		return parse_config
 	else
 		-- path does not exist
 		print("CREATING CONFIG")
@@ -145,7 +145,8 @@ function M.get_config(path)
 			return nil, err
 		end
 
-		return gen_config
+		local parsed_config = M.parse_config(gen_config)
+		return parsed_config
 	end
 end
 

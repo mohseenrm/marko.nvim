@@ -1,4 +1,5 @@
 local file = require("marko.file")
+local utils = require("marko.utils")
 
 local M = {}
 
@@ -40,11 +41,11 @@ end
 function M.setup()
 	vim.api.nvim_create_autocmd("UIEnter", {
 		callback = function()
-			-- gets config if exists else returns generated config
+			-- INFO: clear marks not part of cwd
 			local config = file.get_config(marks_path)
 			print("CONFIG: " .. vim.inspect(config))
-			local project_path = vim.fn.getcwd()
-			local filtered_marks = M.filter_marks(project_path)
+			local cwd = vim.fn.getcwd()
+			local filtered_marks = M.filter_marks(cwd)
 			print("FILTERED_MARKS 2: " .. vim.inspect(filtered_marks))
 		end,
 	})
