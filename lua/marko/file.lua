@@ -1,5 +1,32 @@
-local config = require("marko.config")
+local yaml = require("marko.yaml")
+
 local M = {}
+
+local marks = {}
+-- INFO: A-Z
+for i = 65, 90 do
+	table.insert(marks, string.char(i))
+end
+
+function M.filter_marks(project_path)
+	-- enumerate over marks, check if valid and if starts with project_path
+	local filtered_marks = {}
+	for _, mark in ipairs(marks) do
+		local content = vim.api.nvim_get_mark(mark, {})
+		local mark_path = content[4]
+		local valid = mark_path ~= ""
+		local in_project = mark_path:match(project_path) ~= nil
+
+		if valid and in_project then
+			table.insert(filtered_marks, mark)
+		end
+	end
+	return filtered_marks
+end
+
+function M.parse_config(content)
+	return yaml.eval(content)
+end
 
 function M.check_path(path)
 	local file = io.open(path, "r")
@@ -57,6 +84,16 @@ function M.read_file(path)
 	return content
 end
 
+-- takes cwd, marks_to_save, generates config based on template base_config, mark content can be retrieved from vim.api.nvim_get_mark
+function M.generate_config(cwd, marks_to_save)
+	local base_config = cwd .. ":\n"
+	for _, mark in ipairs(marks_to_save) do
+		local content = vim.api.nvim_get_mark(mark, {})
+		base_config = base_config .. "  - " .. mark .. ": " .. content[1] .. "\n"
+	end
+	return base_config
+end
+
 function M.get_config(path)
 	-- create marks path if does not exist, create new file and save content for cwd
 	local res = M.check_path(path)
@@ -81,8 +118,9 @@ function M.get_config(path)
 		end
 
 		print(content)
-		config.setup()
-		return base_config
+		local test = M.parse_config(content)
+		print("TEST: " .. test)
+		return content
 	else
 		-- path does not exist
 		print("CREATING CONFIG")
@@ -95,11 +133,10 @@ function M.get_config(path)
 		end
 
 		-- process: create config, filter marks, write filtered marks to file, delete + filter global marks
-		local filtered_marks = config.filter_marks(cwd)
-		config.del_marks(filtered_marks)
-		local gen_config = config.generate_config(cwd, filtered_marks)
-
-		print("FILTERED_CONFIG: " .. vim.inspect(filtered_marks))
+		local filtered_marks = M.filter_marks(cwd)
+		print("FILTERED_MARKS 1: " .. vim.inspect(filtered_marks))
+		-- config.del_marks(filtered_marks)
+		local gen_config = M.generate_config(cwd, filtered_marks)
 
 		local success, err = M.write_file(path, gen_config)
 
@@ -108,11 +145,8 @@ function M.get_config(path)
 			return nil, err
 		end
 
-		config.setup()
-		return base_config
+		return gen_config
 	end
-
-	return base_config
 end
 
 return M

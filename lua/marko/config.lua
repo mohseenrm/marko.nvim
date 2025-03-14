@@ -1,4 +1,8 @@
+local file = require("marko.file")
+
 local M = {}
+
+local marks_path = os.getenv("HOME") .. "/.local/share/nvim/marko/config.yaml"
 
 local marks = {}
 -- INFO: A-Z
@@ -24,6 +28,7 @@ end
 
 -- iterate over marks, skips mark if part of table skip, else calls vim.api.nvim_del_mark
 function M.del_marks(skipped_marks)
+	print("SKIPPED_MARKS: " .. vim.inspect(skipped_marks))
 	for _, mark in ipairs(marks) do
 		if not vim.tbl_contains(skipped_marks, mark) then
 			vim.api.nvim_del_mark(mark)
@@ -35,21 +40,14 @@ end
 function M.setup()
 	vim.api.nvim_create_autocmd("UIEnter", {
 		callback = function()
+			-- gets config if exists else returns generated config
+			local config = file.get_config(marks_path)
+			print("CONFIG: " .. vim.inspect(config))
 			local project_path = vim.fn.getcwd()
 			local filtered_marks = M.filter_marks(project_path)
-			print("FILTERED_MARKS: " .. vim.inspect(filtered_marks))
+			print("FILTERED_MARKS 2: " .. vim.inspect(filtered_marks))
 		end,
 	})
-end
-
--- takes cwd, marks_to_save, generates config based on template base_config, mark content can be retrieved from vim.api.nvim_get_mark
-function M.generate_config(cwd, marks_to_save)
-	local base_config = cwd .. ":\n"
-	for _, mark in ipairs(marks_to_save) do
-		local content = vim.api.nvim_get_mark(mark, {})
-		base_config = base_config .. "  - " .. mark .. ": " .. content[1] .. "\n"
-	end
-	return base_config
 end
 
 return M
