@@ -266,6 +266,39 @@ function M.ensure_buffer_filetype(buffer_or_path)
 	return false
 end
 
+-- Function to delete the config file
+function M.delete_config_file()
+	-- Check if config file exists
+	local exists = file.check_path(marks_path)
+
+	if exists then
+		-- Try to delete the file
+		local result, err = os.remove(marks_path)
+
+		if result then
+			-- Reset the cache
+			config_cache = {}
+
+			vim.notify(
+				"Successfully deleted marks config file: " .. marks_path,
+				vim.log.levels.INFO,
+				{ title = "marko.nvim" }
+			)
+			return true
+		else
+			vim.notify(
+				"Failed to delete marks config file: " .. (err or "unknown error"),
+				vim.log.levels.ERROR,
+				{ title = "marko.nvim" }
+			)
+			return false
+		end
+	else
+		vim.notify("Marks config file does not exist: " .. marks_path, vim.log.levels.WARN, { title = "marko.nvim" })
+		return false
+	end
+end
+
 function M.setup()
 	-- Create user command to manually save marks
 	vim.api.nvim_create_user_command("MarkoSave", function()
@@ -279,6 +312,27 @@ function M.setup()
 		M.load_full_config()
 		M.set_marks_from_config()
 	end, { desc = "Clear all marks and reload from config" })
+
+	-- Add a command to delete the config file
+	vim.api.nvim_create_user_command("MarkoDeleteConfig", function()
+		-- Ask for confirmation
+		vim.ui.select({ "Yes", "No" }, {
+			prompt = "Are you sure you want to delete the marks config file?",
+			format_item = function(item)
+				return item
+			end,
+		}, function(choice)
+			if choice == "Yes" then
+				local success = M.delete_config_file()
+				if success then
+					-- Also clear all marks
+					M.clear_all_marks()
+				end
+			else
+				vim.notify("Operation cancelled", vim.log.levels.INFO, { title = "marko.nvim" })
+			end
+		end)
+	end, { desc = "Delete the marks config file" })
 
 	-- Initialize when Neovim starts - clear all marks and load from config
 	vim.api.nvim_create_autocmd("UIEnter", {
@@ -337,4 +391,3 @@ function M.setup()
 end
 
 return M
-
