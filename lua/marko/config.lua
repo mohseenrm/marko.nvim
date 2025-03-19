@@ -149,8 +149,35 @@ function M.set_marks_from_config()
 			local file_exists = vim.fn.filereadable(mark_data.filename) == 1
 
 			if file_exists then
-				-- Open the file to get a valid buffer number
-				local buffer = vim.fn.bufadd(mark_data.filename)
+				-- Use the built-in Neovim method that properly handles file type detection
+				local buffer
+
+				-- Try to find if the buffer is already loaded
+				for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+					if vim.api.nvim_buf_get_name(buf) == mark_data.filename then
+						buffer = buf
+						break
+					end
+				end
+
+				-- If buffer isn't already loaded, create it properly with filetype detection
+				if not buffer then
+					buffer = vim.fn.bufadd(mark_data.filename)
+					if buffer ~= 0 then
+						-- Load the buffer with filetype detection
+						vim.fn.bufload(buffer)
+
+						-- Force filetype detection to ensure syntax highlighting
+						vim.api.nvim_command("doautocmd BufRead " .. vim.fn.fnameescape(mark_data.filename))
+
+						-- Get the filetype based on the filename and set it explicitly
+						local filetype = vim.filetype.match({ filename = mark_data.filename })
+						if filetype then
+							vim.api.nvim_buf_set_option(buffer, "filetype", filetype)
+						end
+					end
+				end
+
 				if buffer == 0 then
 					vim.notify(
 						"Failed to get buffer for file: " .. mark_data.filename,
@@ -158,9 +185,6 @@ function M.set_marks_from_config()
 						{ title = "marko.nvim" }
 					)
 				else
-					-- Ensure the buffer is loaded
-					vim.fn.bufload(buffer)
-
 					-- Set the mark using nvim_buf_set_mark
 					local success =
 						vim.api.nvim_buf_set_mark(buffer, mark_data.mark, mark_data.row, mark_data.col or 0, {})
@@ -254,4 +278,3 @@ function M.setup()
 end
 
 return M
-
