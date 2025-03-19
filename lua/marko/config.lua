@@ -218,6 +218,54 @@ function M.set_marks_from_config()
 	return set_count > 0
 end
 
+-- Helper function to ensure a buffer has proper syntax highlighting
+function M.ensure_buffer_filetype(buffer_or_path)
+	-- Determine if we got a buffer number or a path
+	local buffer = buffer_or_path
+	local path = buffer_or_path
+
+	if type(buffer_or_path) == "string" then
+		-- We got a path, try to find the buffer
+		for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+			if vim.api.nvim_buf_get_name(buf) == path then
+				buffer = buf
+				break
+			end
+		end
+
+		-- If buffer not found, create it
+		if type(buffer) == "string" then
+			buffer = vim.fn.bufadd(path)
+			vim.fn.bufload(buffer)
+		end
+	end
+
+	-- Make sure buffer is valid
+	if buffer and buffer ~= 0 and vim.api.nvim_buf_is_valid(buffer) then
+		-- Get the buffer's filetype
+		local current_ft = vim.api.nvim_buf_get_option(buffer, "filetype")
+
+		-- Only try to set filetype if it's not already set
+		if current_ft == "" then
+			local filename = vim.api.nvim_buf_get_name(buffer)
+			-- Force filetype detection
+			vim.api.nvim_command("doautocmd BufRead " .. vim.fn.fnameescape(filename))
+
+			-- Try to detect filetype from filename
+			local filetype = vim.filetype.match({ filename = filename })
+			if filetype then
+				vim.api.nvim_buf_set_option(buffer, "filetype", filetype)
+				return true
+			end
+		else
+			-- Already has a filetype
+			return true
+		end
+	end
+
+	return false
+end
+
 function M.setup()
 	-- Create user command to manually save marks
 	vim.api.nvim_create_user_command("MarkoSave", function()
@@ -252,6 +300,17 @@ function M.setup()
 		end,
 	})
 
+	-- Fix syntax highlighting when jumping to marks
+	vim.api.nvim_create_autocmd("BufEnter", {
+		callback = function(args)
+			-- Get the buffer number
+			local bufnr = args.buf
+
+			-- Ensure proper filetype for the buffer
+			M.ensure_buffer_filetype(bufnr)
+		end,
+	})
+
 	-- Save marks when Neovim exits
 	vim.api.nvim_create_autocmd("QuitPre", {
 		callback = function()
@@ -278,3 +337,4 @@ function M.setup()
 end
 
 return M
+
