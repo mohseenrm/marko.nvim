@@ -6,7 +6,7 @@ A Neovim plugin for project-scoped marks management. Marko saves and restores yo
 
 - **Project-Scoped Marks**: Only see marks that belong to your current working directory
 - **Persistent Marks**: Marks are automatically saved when you exit Neovim and restored when you return
-- **Proper Filetype Detection**: Ensures buffers opened via marks have proper syntax highlighting
+- **Proper File type Detection**: Ensures buffers opened via marks have proper syntax highlighting
 - **Simple Commands**: Easy-to-use commands for managing your marks
 
 ## Installation
