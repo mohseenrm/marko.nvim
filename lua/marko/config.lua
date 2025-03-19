@@ -134,7 +134,7 @@ function M.setup()
 	})
 
 	-- Save marks when Neovim exits
-	vim.api.nvim_create_autocmd("VimLeavePre", {
+	vim.api.nvim_create_autocmd("QuitPre", {
 		callback = function()
 			-- DON'T reload config before saving to avoid losing marks
 			M.save_current_marks()
@@ -142,20 +142,20 @@ function M.setup()
 	})
 
 	-- Also save marks on buffer write, but throttle it to avoid too many writes
-	local last_save_time = 0
-	vim.api.nvim_create_autocmd("BufWritePost", {
-		callback = function()
-			-- Only save once every 5 seconds at most
-			local current_time = os.time()
-			if current_time - last_save_time >= 5 then
-				-- DON'T reload config before saving to avoid losing marks
-				M.save_current_marks()
-
-				-- Update last save time
-				last_save_time = current_time
-			end
-		end,
-	})
+	-- local last_save_time = 0
+	-- vim.api.nvim_create_autocmd("BufWritePost", {
+	-- 	callback = function()
+	-- 		-- Only save once every 5 seconds at most
+	-- 		local current_time = os.time()
+	-- 		if current_time - last_save_time >= 5 then
+	-- 			-- DON'T reload config before saving to avoid losing marks
+	-- 			M.save_current_marks()
+	--
+	-- 			-- Update last save time
+	-- 			last_save_time = current_time
+	-- 		end
+	-- 	end,
+	-- })
 end
 
 return M
