@@ -22,11 +22,6 @@ end
 -- Clear all marks except those in the skipped_marks table
 function M.del_marks(skipped_marks)
 	skipped_marks = skipped_marks or {}
-	vim.notify(
-		"Clearing marks (except " .. #skipped_marks .. " skipped)",
-		vim.log.levels.DEBUG,
-		{ title = "marko.nvim" }
-	)
 
 	for _, mark in ipairs(marks) do
 		if not vim.tbl_contains(skipped_marks, mark) then
@@ -37,7 +32,6 @@ end
 
 -- Clear all marks (no exceptions)
 function M.clear_all_marks()
-	vim.notify("Clearing all marks", vim.log.levels.DEBUG, { title = "marko.nvim" })
 	for _, mark in ipairs(marks) do
 		vim.api.nvim_del_mark(mark)
 	end
@@ -46,7 +40,6 @@ end
 -- Function to save the current directory's marks
 function M.save_current_marks()
 	local cwd = vim.fn.getcwd()
-	vim.notify("Saving marks for: " .. cwd, vim.log.levels.DEBUG, { title = "marko.nvim" })
 
 	-- Get marks for current directory
 	local curr_marks = file.filter_marks(cwd)
@@ -59,7 +52,6 @@ function M.save_current_marks()
 			-- Update our local cache with the result from file.save_directory_marks
 			config_cache = result
 
-			vim.notify("Successfully saved marks for " .. cwd, vim.log.levels.DEBUG, { title = "marko.nvim" })
 			return true
 		else
 			vim.notify(
@@ -70,7 +62,6 @@ function M.save_current_marks()
 			return false
 		end
 	else
-		vim.notify("No marks found to save", vim.log.levels.DEBUG, { title = "marko.nvim" })
 		return false
 	end
 end
@@ -94,7 +85,6 @@ end
 -- Set marks from the config for the current directory
 function M.set_marks_from_config()
 	local cwd = vim.fn.getcwd()
-	vim.notify("Setting marks for directory: " .. cwd, vim.log.levels.DEBUG, { title = "marko.nvim" })
 
 	-- Ensure we have a loaded config
 	if not config_cache then
@@ -103,7 +93,6 @@ function M.set_marks_from_config()
 
 	-- Check if we have marks for this directory
 	if not config_cache or not config_cache[cwd] or #config_cache[cwd] == 0 then
-		vim.notify("No saved marks found for directory: " .. cwd, vim.log.levels.DEBUG, { title = "marko.nvim" })
 		return false
 	end
 
@@ -171,7 +160,6 @@ function M.set_marks_from_config()
 		end
 	end
 
-	vim.notify("Set " .. set_count .. " marks for directory: " .. cwd, vim.log.levels.DEBUG, { title = "marko.nvim" })
 	return set_count > 0
 end
 
@@ -237,7 +225,6 @@ function M.delete_config_file()
 			-- Reset the cache
 			config_cache = {}
 
-			vim.notify("Successfully deleted marks config file", vim.log.levels.DEBUG, { title = "marko.nvim" })
 			return true
 		else
 			vim.notify(
@@ -248,7 +235,6 @@ function M.delete_config_file()
 			return false
 		end
 	else
-		vim.notify("Marks config file does not exist", vim.log.levels.DEBUG, { title = "marko.nvim" })
 		return false
 	end
 end
@@ -290,12 +276,6 @@ function M.setup()
 	-- Initialize when Neovim starts - clear all marks and load from config
 	vim.api.nvim_create_autocmd("UIEnter", {
 		callback = function()
-			vim.notify(
-				"Initializing marko.nvim for directory: " .. vim.fn.getcwd(),
-				vim.log.levels.DEBUG,
-				{ title = "marko.nvim" }
-			)
-
 			-- Load config first to initialize cache
 			M.load_full_config()
 
