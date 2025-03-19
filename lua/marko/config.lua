@@ -142,7 +142,7 @@ function M.set_marks_from_config()
 						-- Get the filetype based on the filename and set it explicitly
 						local filetype = vim.filetype.match({ filename = mark_data.filename })
 						if filetype then
-							vim.api.nvim_buf_set_option(buffer, "filetype", filetype)
+							vim.api.nvim_set_option_value("filetype", filetype, { buf = buffer })
 						end
 					end
 				end
@@ -200,8 +200,8 @@ function M.ensure_buffer_filetype(buffer_or_path)
 
 	-- Make sure buffer is valid
 	if buffer and buffer ~= 0 and vim.api.nvim_buf_is_valid(buffer) then
-		-- Get the buffer's filetype
-		local current_ft = vim.api.nvim_buf_get_option(buffer, "filetype")
+		-- Get the buffer's filetype using the new API
+		local current_ft = vim.api.nvim_get_option_value("filetype", { buf = buffer })
 
 		-- Only try to set filetype if it's not already set
 		if current_ft == "" then
@@ -212,7 +212,8 @@ function M.ensure_buffer_filetype(buffer_or_path)
 			-- Try to detect filetype from filename
 			local filetype = vim.filetype.match({ filename = filename })
 			if filetype then
-				vim.api.nvim_buf_set_option(buffer, "filetype", filetype)
+				-- Set filetype using the new API
+				vim.api.nvim_set_option_value("filetype", filetype, { buf = buffer })
 				return true
 			end
 		else
@@ -343,3 +344,4 @@ function M.setup()
 end
 
 return M
+
