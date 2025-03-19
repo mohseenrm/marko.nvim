@@ -5,7 +5,7 @@ local function parse_value(value)
 	if not value then
 		return nil
 	end
-	
+
 	if value == "true" then
 		return true
 	elseif value == "false" then

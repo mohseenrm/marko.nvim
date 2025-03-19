@@ -1,5 +1,3 @@
-local yaml = require("marko.yaml")
-
 local M = {}
 
 local marks = {}

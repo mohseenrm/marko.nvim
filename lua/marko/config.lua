@@ -1,5 +1,4 @@
 local file = require("marko.file")
-local utils = require("marko.utils")
 
 local M = {}
 
@@ -344,4 +343,3 @@ function M.setup()
 end
 
 return M
-

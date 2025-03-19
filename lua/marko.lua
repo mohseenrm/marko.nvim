@@ -1,1 +1,2 @@
-print("Hello World")
+-- Export the marko module
+return require("marko.init")
