@@ -15,7 +15,7 @@ Using [packer.nvim](https://github.com/wbthomason/packer.nvim):
 
 ```lua
 use {
-  "mmukaddam/marko.nvim",
+  "mohseenrm/marko.nvim",
   config = function()
     require("marko").setup()
   end
@@ -26,7 +26,7 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ```lua
 {
-  "mmukaddam/marko.nvim",
+  "mohseenrm/marko.nvim",
   config = function()
     require("marko").setup()
   end
@@ -37,7 +37,7 @@ Or with configuration options using lazy.nvim's `opts` feature:
 
 ```lua
 {
-  "mmukaddam/marko.nvim",
+  "mohseenrm/marko.nvim",
   opts = {
     auto_save = true,
     debug = false
