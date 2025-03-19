@@ -25,7 +25,7 @@ function M.del_marks(skipped_marks)
 	skipped_marks = skipped_marks or {}
 	vim.notify(
 		"Clearing marks (except " .. #skipped_marks .. " skipped)",
-		vim.log.levels.INFO,
+		vim.log.levels.DEBUG,
 		{ title = "marko.nvim" }
 	)
 
@@ -38,7 +38,7 @@ end
 
 -- Clear all marks (no exceptions)
 function M.clear_all_marks()
-	vim.notify("Clearing all marks", vim.log.levels.INFO, { title = "marko.nvim" })
+	vim.notify("Clearing all marks", vim.log.levels.DEBUG, { title = "marko.nvim" })
 	for _, mark in ipairs(marks) do
 		vim.api.nvim_del_mark(mark)
 	end
@@ -47,28 +47,12 @@ end
 -- Function to save the current directory's marks
 function M.save_current_marks()
 	local cwd = vim.fn.getcwd()
-	vim.notify("Saving marks for: " .. cwd, vim.log.levels.INFO, { title = "marko.nvim" })
+	vim.notify("Saving marks for: " .. cwd, vim.log.levels.DEBUG, { title = "marko.nvim" })
 
-	-- IMPORTANT: Use the file.lua implementation of filter_marks since it's more robust
+	-- Get marks for current directory
 	local curr_marks = file.filter_marks(cwd)
-	vim.notify(
-		"Found " .. #curr_marks .. " marks for project using file.filter_marks",
-		vim.log.levels.WARN,
-		{ title = "marko.nvim" }
-	)
 
-	-- Debug what we found
 	if #curr_marks > 0 then
-		vim.notify("Found " .. #curr_marks .. " marks to save", vim.log.levels.INFO, { title = "marko.nvim" })
-
-		-- List each mark for debugging
-		for _, mark in ipairs(curr_marks) do
-			local content = vim.api.nvim_get_mark(mark, {})
-			if content and content[4] then
-				vim.notify("Mark " .. mark .. " at " .. content[4], vim.log.levels.DEBUG, { title = "marko.nvim" })
-			end
-		end
-
 		-- Call file.save_directory_marks directly which will handle the saving
 		local result, err = file.save_directory_marks(marks_path, cwd)
 
@@ -76,11 +60,7 @@ function M.save_current_marks()
 			-- Update our local cache with the result from file.save_directory_marks
 			config_cache = result
 
-			vim.notify(
-				"Successfully saved marks for " .. cwd .. " using file.save_directory_marks",
-				vim.log.levels.INFO,
-				{ title = "marko.nvim" }
-			)
+			vim.notify("Successfully saved marks for " .. cwd, vim.log.levels.DEBUG, { title = "marko.nvim" })
 			return true
 		else
 			vim.notify(
@@ -91,7 +71,7 @@ function M.save_current_marks()
 			return false
 		end
 	else
-		vim.notify("No marks found to save", vim.log.levels.WARN, { title = "marko.nvim" })
+		vim.notify("No marks found to save", vim.log.levels.DEBUG, { title = "marko.nvim" })
 		return false
 	end
 end
@@ -103,17 +83,6 @@ function M.load_full_config()
 		local config = file.parse_config(content)
 		if config and type(config) == "table" then
 			config_cache = config
-
-			-- Log directories found
-			local dirs = vim.tbl_keys(config)
-			if #dirs > 0 then
-				vim.notify(
-					"Loaded config with directories: " .. table.concat(dirs, ", "),
-					vim.log.levels.DEBUG,
-					{ title = "marko.nvim" }
-				)
-			end
-
 			return config
 		end
 	end
@@ -126,7 +95,7 @@ end
 -- Set marks from the config for the current directory
 function M.set_marks_from_config()
 	local cwd = vim.fn.getcwd()
-	vim.notify("Setting marks for directory: " .. cwd, vim.log.levels.INFO, { title = "marko.nvim" })
+	vim.notify("Setting marks for directory: " .. cwd, vim.log.levels.DEBUG, { title = "marko.nvim" })
 
 	-- Ensure we have a loaded config
 	if not config_cache then
@@ -135,7 +104,7 @@ function M.set_marks_from_config()
 
 	-- Check if we have marks for this directory
 	if not config_cache or not config_cache[cwd] or #config_cache[cwd] == 0 then
-		vim.notify("No saved marks found for directory: " .. cwd, vim.log.levels.WARN, { title = "marko.nvim" })
+		vim.notify("No saved marks found for directory: " .. cwd, vim.log.levels.DEBUG, { title = "marko.nvim" })
 		return false
 	end
 
@@ -191,11 +160,6 @@ function M.set_marks_from_config()
 
 					if success then
 						set_count = set_count + 1
-						vim.notify(
-							"Set mark " .. mark_data.mark .. " at " .. mark_data.filename .. ":" .. mark_data.row,
-							vim.log.levels.DEBUG,
-							{ title = "marko.nvim" }
-						)
 					else
 						vim.notify(
 							"Failed to set mark " .. mark_data.mark .. " at " .. mark_data.filename,
@@ -204,17 +168,11 @@ function M.set_marks_from_config()
 						)
 					end
 				end
-			else
-				vim.notify(
-					"Skipping mark " .. mark_data.mark .. " - file does not exist: " .. mark_data.filename,
-					vim.log.levels.WARN,
-					{ title = "marko.nvim" }
-				)
 			end
 		end
 	end
 
-	vim.notify("Set " .. set_count .. " marks for directory: " .. cwd, vim.log.levels.INFO, { title = "marko.nvim" })
+	vim.notify("Set " .. set_count .. " marks for directory: " .. cwd, vim.log.levels.DEBUG, { title = "marko.nvim" })
 	return set_count > 0
 end
 
@@ -279,11 +237,7 @@ function M.delete_config_file()
 			-- Reset the cache
 			config_cache = {}
 
-			vim.notify(
-				"Successfully deleted marks config file: " .. marks_path,
-				vim.log.levels.INFO,
-				{ title = "marko.nvim" }
-			)
+			vim.notify("Successfully deleted marks config file", vim.log.levels.DEBUG, { title = "marko.nvim" })
 			return true
 		else
 			vim.notify(
@@ -294,7 +248,7 @@ function M.delete_config_file()
 			return false
 		end
 	else
-		vim.notify("Marks config file does not exist: " .. marks_path, vim.log.levels.WARN, { title = "marko.nvim" })
+		vim.notify("Marks config file does not exist", vim.log.levels.DEBUG, { title = "marko.nvim" })
 		return false
 	end
 end
@@ -302,7 +256,6 @@ end
 function M.setup()
 	-- Create user command to manually save marks
 	vim.api.nvim_create_user_command("MarkoSave", function()
-		-- Skip reloading config to avoid overwriting marks
 		M.save_current_marks()
 	end, { desc = "Save marks for current directory" })
 
@@ -339,7 +292,7 @@ function M.setup()
 		callback = function()
 			vim.notify(
 				"Initializing marko.nvim for directory: " .. vim.fn.getcwd(),
-				vim.log.levels.INFO,
+				vim.log.levels.DEBUG,
 				{ title = "marko.nvim" }
 			)
 
@@ -368,7 +321,6 @@ function M.setup()
 	-- Save marks when Neovim exits
 	vim.api.nvim_create_autocmd("QuitPre", {
 		callback = function()
-			-- DON'T reload config before saving to avoid losing marks
 			M.save_current_marks()
 		end,
 	})
