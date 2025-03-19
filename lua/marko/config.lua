@@ -20,13 +20,27 @@ function M.filter_marks(project_path)
 	return file.filter_marks(project_path)
 end
 
--- iterate over marks, skips mark if part of table skip, else calls vim.api.nvim_del_mark
+-- Clear all marks except those in the skipped_marks table
 function M.del_marks(skipped_marks)
-	print("SKIPPED_MARKS: " .. vim.inspect(skipped_marks))
+	skipped_marks = skipped_marks or {}
+	vim.notify(
+		"Clearing marks (except " .. #skipped_marks .. " skipped)",
+		vim.log.levels.INFO,
+		{ title = "marko.nvim" }
+	)
+
 	for _, mark in ipairs(marks) do
 		if not vim.tbl_contains(skipped_marks, mark) then
 			vim.api.nvim_del_mark(mark)
 		end
+	end
+end
+
+-- Clear all marks (no exceptions)
+function M.clear_all_marks()
+	vim.notify("Clearing all marks", vim.log.levels.INFO, { title = "marko.nvim" })
+	for _, mark in ipairs(marks) do
+		vim.api.nvim_del_mark(mark)
 	end
 end
 
@@ -109,6 +123,77 @@ function M.load_full_config()
 	return {}
 end
 
+-- Set marks from the config for the current directory
+function M.set_marks_from_config()
+	local cwd = vim.fn.getcwd()
+	vim.notify("Setting marks for directory: " .. cwd, vim.log.levels.INFO, { title = "marko.nvim" })
+
+	-- Ensure we have a loaded config
+	if not config_cache then
+		M.load_full_config()
+	end
+
+	-- Check if we have marks for this directory
+	if not config_cache or not config_cache[cwd] or #config_cache[cwd] == 0 then
+		vim.notify("No saved marks found for directory: " .. cwd, vim.log.levels.WARN, { title = "marko.nvim" })
+		return false
+	end
+
+	local dir_marks = config_cache[cwd]
+	local set_count = 0
+
+	-- Set each mark from the config
+	for _, mark_data in ipairs(dir_marks) do
+		if mark_data.mark and mark_data.filename and mark_data.row then
+			-- Check if the file exists
+			local file_exists = vim.fn.filereadable(mark_data.filename) == 1
+
+			if file_exists then
+				-- Open the file to get a valid buffer number
+				local buffer = vim.fn.bufadd(mark_data.filename)
+				if buffer == 0 then
+					vim.notify(
+						"Failed to get buffer for file: " .. mark_data.filename,
+						vim.log.levels.WARN,
+						{ title = "marko.nvim" }
+					)
+				else
+					-- Ensure the buffer is loaded
+					vim.fn.bufload(buffer)
+
+					-- Set the mark using nvim_buf_set_mark
+					local success =
+						vim.api.nvim_buf_set_mark(buffer, mark_data.mark, mark_data.row, mark_data.col or 0, {})
+
+					if success then
+						set_count = set_count + 1
+						vim.notify(
+							"Set mark " .. mark_data.mark .. " at " .. mark_data.filename .. ":" .. mark_data.row,
+							vim.log.levels.DEBUG,
+							{ title = "marko.nvim" }
+						)
+					else
+						vim.notify(
+							"Failed to set mark " .. mark_data.mark .. " at " .. mark_data.filename,
+							vim.log.levels.WARN,
+							{ title = "marko.nvim" }
+						)
+					end
+				end
+			else
+				vim.notify(
+					"Skipping mark " .. mark_data.mark .. " - file does not exist: " .. mark_data.filename,
+					vim.log.levels.WARN,
+					{ title = "marko.nvim" }
+				)
+			end
+		end
+	end
+
+	vim.notify("Set " .. set_count .. " marks for directory: " .. cwd, vim.log.levels.INFO, { title = "marko.nvim" })
+	return set_count > 0
+end
+
 function M.setup()
 	-- Create user command to manually save marks
 	vim.api.nvim_create_user_command("MarkoSave", function()
@@ -116,7 +201,14 @@ function M.setup()
 		M.save_current_marks()
 	end, { desc = "Save marks for current directory" })
 
-	-- Load marks when Neovim starts and save any current marks
+	-- Add a command to clear and reload marks
+	vim.api.nvim_create_user_command("MarkoReload", function()
+		M.clear_all_marks()
+		M.load_full_config()
+		M.set_marks_from_config()
+	end, { desc = "Clear all marks and reload from config" })
+
+	-- Initialize when Neovim starts - clear all marks and load from config
 	vim.api.nvim_create_autocmd("UIEnter", {
 		callback = function()
 			vim.notify(
@@ -128,8 +220,11 @@ function M.setup()
 			-- Load config first to initialize cache
 			M.load_full_config()
 
-			-- Then save current marks
-			M.save_current_marks()
+			-- Clear all existing marks
+			M.clear_all_marks()
+
+			-- Set marks from the config
+			M.set_marks_from_config()
 		end,
 	})
 
@@ -159,3 +254,4 @@ function M.setup()
 end
 
 return M
+
