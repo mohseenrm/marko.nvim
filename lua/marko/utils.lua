@@ -69,6 +69,31 @@ function M.set_global_mark(mark, row, col, buffer, filename)
 	-- Set the mark - use correct API based on Neovim version
 	local success = false
 
+	-- Load the buffer to ensure we can get line count
+	vim.fn.bufload(buffer)
+
+	-- Get total number of lines in the buffer
+	local line_count = vim.api.nvim_buf_line_count(buffer)
+
+	-- Ensure row is within valid range (1 to line_count)
+	if row < 1 or row > line_count then
+		M.log(
+			"Mark "
+				.. mark
+				.. ": Row "
+				.. row
+				.. " is outside valid range (1-"
+				.. line_count
+				.. ") for "
+				.. expanded_filename
+				.. ". Using line 1 instead.",
+			vim.log.levels.WARN,
+			{ title = "marko.nvim" }
+		)
+		-- Set to line 1 as fallback
+		row = 1
+	end
+
 	-- Neovim 0.10+ has a global nvim_set_mark function
 	if vim.fn.has("nvim-0.10") == 1 and vim.api.nvim_set_mark then
 		success = vim.api.nvim_set_mark(mark, row, col, {})

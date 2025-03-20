@@ -136,8 +136,22 @@ function M.set_marks_from_config()
 	-- Set each mark from the config
 	for _, mark_data in ipairs(dir_marks) do
 		if mark_data.mark and mark_data.filename and mark_data.row then
-			-- Check if the file exists
-			local file_exists = vim.fn.filereadable(mark_data.filename) == 1
+			-- Expand any ~ in filename
+			local expanded_filename = mark_data.filename
+			if expanded_filename:match("^~/") then
+				local home_dir = os.getenv("HOME")
+				if home_dir then
+					expanded_filename = home_dir .. expanded_filename:sub(2)
+					utils.log(
+						"Expanded filename from " .. mark_data.filename .. " to " .. expanded_filename,
+						vim.log.levels.INFO,
+						{ title = "marko.nvim" }
+					)
+				end
+			end
+
+			-- Check if the file exists using expanded filename
+			local file_exists = vim.fn.filereadable(expanded_filename) == 1
 
 			if file_exists then
 				-- Use our utility function to set the global mark
@@ -146,14 +160,22 @@ function M.set_marks_from_config()
 					mark_data.row,
 					mark_data.col or 0,
 					mark_data.buffer or 0,
-					mark_data.filename
+					expanded_filename
 				)
 
 				if success then
 					set_count = set_count + 1
 				end
 			else
-				utils.log("File not found: " .. mark_data.filename, vim.log.levels.WARN, { title = "marko.nvim" })
+				if expanded_filename ~= mark_data.filename then
+					utils.log(
+						"File not found: " .. mark_data.filename .. " (expanded to: " .. expanded_filename .. ")",
+						vim.log.levels.WARN,
+						{ title = "marko.nvim" }
+					)
+				else
+					utils.log("File not found: " .. mark_data.filename, vim.log.levels.WARN, { title = "marko.nvim" })
+				end
 			end
 		else
 			vim.notify("Invalid mark data: missing required fields", vim.log.levels.WARN, { title = "marko.nvim" })

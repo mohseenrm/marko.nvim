@@ -8,6 +8,8 @@ A behind the scene global marks manager for Neovim. Marko saves and restores you
 - **Persistent Global Marks**: Global Marks are automatically saved when you exit Neovim and restored when you return
 - **Proper File type Detection**: Ensures buffers opened via global marks have proper syntax highlighting
 - **Simple Commands**: Easy-to-use commands for managing your global marks
+- **Path Expansion**: Supports `~` in file paths and handles both absolute and relative paths correctly
+- **Error Recovery**: Automatically adjusts invalid line numbers when files change
 
 ## Installation 🚀
 
@@ -73,6 +75,8 @@ Marko provides the following commands:
 - `:MarkoSave` - Manually save global marks for the current directory
 - `:MarkoReload` - Clear all global marks and reload from config
 - `:MarkoDeleteConfig` - Delete the global marks config file (with confirmation)
+- `:MarkoMark {A-Z}` - Set a global mark at the current cursor position (e.g., `:MarkoMark A` sets mark A)
+- `:MarkoDebug` - Display detailed information about all global marks, including filtered marks for the current directory and config file content
 
 ### Configuration
 
@@ -96,9 +100,11 @@ Marko saves your global marks in `~/.local/share/nvim/marko/config.yaml` and man
 
 1. Clear all existing global marks
 2. Loads global marks from config that match your current directory
-3. Set those global marks in the appropriate files
+3. Expands paths that start with `~` to full absolute paths
+4. Set those global marks in the appropriate files
+5. Automatically adjusts line numbers if they're outside the valid range for a file
 
-When you exit Neovim, your current global marks are saved automatically.
+When you exit Neovim, your current global marks are saved automatically. The plugin handles both absolute and relative paths, automatically expanding home directory references (`~`) to ensure proper mark restoration across different environments.
 
 ## Features Explained
 
@@ -135,7 +141,15 @@ Marks are stored in a YAML file with the following structure:
       col: 2
       buffer: 1
       filename: "/path/to/project2/test.lua"
+  - mark: "D"
+    data:
+      row: 5
+      col: 0
+      buffer: 3
+      filename: "~/Projects/project2/config.lua"
 ```
+
+Both absolute paths and paths with `~` (home directory) are supported. The plugin will automatically expand `~` to the full home directory path when restoring marks.
 
 ## Development
 
