@@ -17,7 +17,7 @@ function M.setup(opts)
 	end
 
 	-- Initialize the config module
-	config.setup()
+	config.setup(opts)
 
 	return M
 end

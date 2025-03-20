@@ -239,7 +239,7 @@ function M.delete_config_file()
 	end
 end
 
-function M.setup()
+function M.setup(opts)
 	-- Create user command to manually save marks
 	vim.api.nvim_create_user_command("MarkoSave", function()
 		M.save_current_marks()
