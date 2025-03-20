@@ -1,4 +1,4 @@
-#\!/usr/bin/env lua
+#!/usr/bin/env lua
 
 -- Add current directory and project paths to package path
 package.path = package.path .. ";./?.lua;./lua/?.lua;./lua/?/init.lua"
@@ -39,3 +39,4 @@ if ok2 then
         print("config value:", config)
     end
 end
+
