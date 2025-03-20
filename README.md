@@ -8,8 +8,6 @@ A behind the scene global marks manager for Neovim. Marko saves and restores you
 - **Persistent Global Marks**: Global Marks are automatically saved when you exit Neovim and restored when you return
 - **Proper File type Detection**: Ensures buffers opened via global marks have proper syntax highlighting
 - **Simple Commands**: Easy-to-use commands for managing your global marks
-- **Path Expansion**: Supports `~` in file paths and handles both absolute and relative paths correctly
-- **Error Recovery**: Automatically adjusts invalid line numbers when files change
 
 ## Installation 🚀
 

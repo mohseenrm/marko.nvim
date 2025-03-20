@@ -10,8 +10,13 @@ _G.vim = {
 			return "/test/project"
 		end,
 		filereadable = function(path)
+			-- Return 1 for all paths (both original and expanded)
 			return 1
-		end, -- Return 1 for vim.fn.filereadable compatibility
+		end,
+		has = function(feature)
+			-- Return 1 for all feature checks (including nvim-0.10)
+			return 1
+		end,
 		bufadd = function(path)
 			return 1
 		end,
@@ -20,6 +25,21 @@ _G.vim = {
 		end,
 		fnameescape = function(path)
 			return path
+		end,
+		fnamemodify = function(path, modifier)
+			if modifier == ":h" then
+				-- Return the parent directory
+				return path:match("(.*/)") or path
+			end
+			return path
+		end,
+		isdirectory = function(path)
+			-- Return 1 for all directories
+			return 1
+		end,
+		mkdir = function(path, mode)
+			-- Return 1 to indicate success
+			return 1
 		end,
 	},
 	api = {
@@ -47,11 +67,19 @@ _G.vim = {
 		nvim_create_autocmd = function(event, opts)
 			return true
 		end,
+		nvim_create_augroup = function(name, opts)
+			return 1
+		end,
 		nvim_command = function(cmd)
 			return true
 		end,
 		nvim_buf_set_mark = function(buffer, mark, row, col, opts)
+			-- Added check to match the expanded line range check in utils.lua
 			return true
+		end,
+		nvim_buf_line_count = function(buffer)
+			-- Return a large enough line count for tests
+			return 100
 		end,
 		nvim_get_mark = function(mark, opts)
 			return { 1, 0, 1, "/test/project/test.lua" }

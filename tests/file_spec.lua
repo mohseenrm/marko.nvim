@@ -20,26 +20,30 @@ describe("file", function()
 	describe("filter_marks", function()
 		it("should return marks that belong to the project path", function()
 			local filtered = file.filter_marks("/test/project")
-			assert.are.same(#filtered, 2)
+			assert.are.same(#filtered, 3) -- Now 3 marks with the tilde path
 			assert.is_true(vim.tbl_contains(filtered, "A"))
 			assert.is_true(vim.tbl_contains(filtered, "B"))
+			assert.is_true(vim.tbl_contains(filtered, "D")) -- The tilde path mark
 			assert.is_false(vim.tbl_contains(filtered, "C"))
+			assert.is_false(vim.tbl_contains(filtered, "E"))
 		end)
 
 		it("should handle paths with and without trailing slash", function()
 			local filtered1 = file.filter_marks("/test/project")
 			local filtered2 = file.filter_marks("/test/project/")
 
-			assert.are.same(#filtered1, 2)
-			assert.are.same(#filtered2, 2)
+			assert.are.same(#filtered1, 3) -- Now 3 marks with the tilde path
+			assert.are.same(#filtered2, 3) -- Now 3 marks with the tilde path
 		end)
 
 		it("should not include marks from other projects", function()
 			local filtered = file.filter_marks("/another/project")
-			assert.are.same(#filtered, 1)
+			assert.are.same(#filtered, 2) -- Now 2 marks with the tilde path
 			assert.is_true(vim.tbl_contains(filtered, "C"))
+			assert.is_true(vim.tbl_contains(filtered, "E")) -- The tilde path mark
 			assert.is_false(vim.tbl_contains(filtered, "A"))
 			assert.is_false(vim.tbl_contains(filtered, "B"))
+			assert.is_false(vim.tbl_contains(filtered, "D"))
 		end)
 	end)
 
@@ -51,8 +55,8 @@ describe("file", function()
 			assert.is_table(config["/test/project"])
 			assert.is_table(config["/another/project"])
 
-			assert.are.same(#config["/test/project"], 2)
-			assert.are.same(#config["/another/project"], 1)
+			assert.are.same(#config["/test/project"], 3) -- Now 3 with tilde path
+			assert.are.same(#config["/another/project"], 2) -- Now 2 with tilde path
 
 			-- Check specific mark data
 			local mark_a = config["/test/project"][1]
@@ -60,6 +64,13 @@ describe("file", function()
 			assert.are.same(mark_a.row, 10)
 			assert.are.same(mark_a.col, 0)
 			assert.are.same(mark_a.filename, "/test/project/test.lua")
+
+			-- Check tilde path mark
+			local mark_d = config["/test/project"][3]
+			assert.are.same(mark_d.mark, "D")
+			assert.are.same(mark_d.row, 30)
+			assert.are.same(mark_d.col, 0)
+			assert.are.same(mark_d.filename, "~/test/project/tilde_path.lua")
 		end)
 
 		it("should handle empty input", function()
@@ -102,7 +113,7 @@ describe("file", function()
 			-- Verify the config contains the expected marks
 			assert.is_table(result)
 			assert.is_table(result["/test/project"])
-			assert.are.same(#result["/test/project"], 2)
+			assert.are.same(#result["/test/project"], 3) -- Now 3 with tilde path
 		end)
 
 		it("should preserve existing marks for other directories", function()

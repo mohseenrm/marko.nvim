@@ -18,6 +18,12 @@ M.create_test_config = function()
       col: 5
       buffer: 1
       filename: "/test/project/another.lua"
+  - mark: "D"
+    data:
+      row: 30
+      col: 0
+      buffer: 1
+      filename: "~/test/project/tilde_path.lua"
 /another/project:
   - mark: "C"
     data:
@@ -25,6 +31,12 @@ M.create_test_config = function()
       col: 2
       buffer: 1
       filename: "/another/project/test.lua"
+  - mark: "E"
+    data:
+      row: 5
+      col: 0 
+      buffer: 1
+      filename: "~/another/project/home_file.lua"
 ]]
 end
 
@@ -50,6 +62,10 @@ M.setup_mock_marks = function()
 			return { 20, 5, 1, "/test/project/another.lua" }
 		elseif mark == "C" then
 			return { 15, 2, 1, "/another/project/test.lua" }
+		elseif mark == "D" then
+			return { 30, 0, 1, "~/test/project/tilde_path.lua" }
+		elseif mark == "E" then
+			return { 5, 0, 1, "~/another/project/home_file.lua" }
 		else
 			return { 0, 0, 0, "" }
 		end
