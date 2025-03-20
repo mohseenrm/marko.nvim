@@ -79,4 +79,3 @@ M.spy = function(obj, method_name)
 end
 
 return M
-
