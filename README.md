@@ -1,15 +1,15 @@
 # marko.nvim
 
-A Neovim plugin for project-scoped marks management. Marko saves and restores your marks for each project directory, so they persist across Neovim sessions and are properly isolated between projects.
+A behind the scene global marks manager for Neovim. Marko saves and restores your marks for each project directory, so they persist across Neovim sessions and are properly isolated between projects.
 
-## Features
+## Features ✨
 
 - **Project-Scoped Marks**: Only see marks that belong to your current working directory
 - **Persistent Marks**: Marks are automatically saved when you exit Neovim and restored when you return
 - **Proper File type Detection**: Ensures buffers opened via marks have proper syntax highlighting
 - **Simple Commands**: Easy-to-use commands for managing your marks
 
-## Installation
+## Installation 🚀
 
 Using [packer.nvim](https://github.com/wbthomason/packer.nvim):
 
@@ -39,7 +39,6 @@ Or with configuration options using lazy.nvim's `opts` feature:
 {
   "mohseenrm/marko.nvim",
   opts = {
-    auto_save = true,
     debug = false
   }
 }
@@ -47,11 +46,11 @@ Or with configuration options using lazy.nvim's `opts` feature:
 
 The `opts` table will be automatically passed to the setup function by lazy.nvim.
 
-## Usage
+## Usage 🪝
 
 ### Setting Marks
 
-Marko works with Neovim's uppercase marks (A-Z). Set marks as you normally would:
+Marko works with Neovim's uppercase global marks (A-Z). Set marks as you normally would:
 
 ```
 mA  # Set mark A at current cursor position
@@ -87,7 +86,6 @@ Setup with custom options:
 
 ```lua
 require("marko").setup({
-  auto_save = true,  -- Auto-save marks more frequently
   debug = false      -- Set to true for verbose logging
 })
 ```
