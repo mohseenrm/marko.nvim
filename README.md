@@ -190,6 +190,24 @@ Tests are written in a simple test framework:
 lua tests/run.lua
 ```
 
+### Linting
+
+The project uses `luacheck` for static code analysis:
+
+```bash
+# Install luacheck via LuaRocks
+luarocks install luacheck
+export PATH=~/.luarocks/bin:$PATH
+
+# Run luacheck on the entire project
+luacheck lua/
+
+# Run luacheck on a specific file
+luacheck lua/marko/file.lua
+```
+
+Luacheck configuration is managed via the `.luacheckrc` file at the project root.
+
 ### Guidelines for Contributing
 
 1. **Create a Feature Branch**: Always work on a feature branch, not directly on `main`
