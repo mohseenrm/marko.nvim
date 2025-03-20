@@ -16,34 +16,137 @@ function M.filter_marks(project_path)
 		normalized_project_path = normalized_project_path .. "/"
 	end
 
+	-- Debug info
+	-- vim.notify("Filtering marks for project path: " .. project_path, vim.log.levels.INFO, { title = "marko.nvim" })
+	-- vim.notify("Normalized project path: " .. normalized_project_path, vim.log.levels.INFO, { title = "marko.nvim" })
+
+	-- Get the HOME path for tilde expansion
+	local home_dir = os.getenv("HOME")
+	local home_pattern = "^~/"
+
+	-- For tilde comparison, create a version of project path with tilde
+	local tilde_project_path = project_path
+	if home_dir and string.find(project_path, home_dir) == 1 then
+		tilde_project_path = "~" .. string.sub(project_path, #home_dir + 1)
+		-- vim.notify("Tilde project path: " .. tilde_project_path, vim.log.levels.INFO, { title = "marko.nvim" })
+	end
+
+	-- Create normalized tilde path
+	local normalized_tilde_path = tilde_project_path
+	if normalized_tilde_path:sub(-1) ~= "/" then
+		normalized_tilde_path = normalized_tilde_path .. "/"
+	end
+
 	for _, mark in ipairs(marks) do
 		local content = vim.api.nvim_get_mark(mark, {})
 		local mark_path = content[4] or ""
+
+		-- Debug for each mark check
+		local debug_info = "Mark " .. mark .. ": "
+		if mark_path and mark_path ~= "" then
+			debug_info = debug_info .. "path=" .. mark_path
+		else
+			debug_info = debug_info .. "No path (empty or nil)"
+		end
+		-- vim.notify(debug_info, vim.log.levels.INFO, { title = "marko.nvim" })
 
 		-- More detailed validation
 		local valid = mark_path ~= "" and mark_path ~= nil
 		local in_project = false
 
 		if valid then
-			-- Normalize the mark path to ensure it's a file path
+			-- Normalize the mark path for comparison
 			local mark_file_path = mark_path
 
-			-- Only use direct prefix match for exact path matching
-			-- This ensures the mark path starts with the project path
-			if string.sub(mark_file_path, 1, #normalized_project_path) == normalized_project_path then
+			-- Expand tilde in paths for comparison if needed
+			local expanded_mark_path = mark_file_path
+			if string.find(mark_file_path, home_pattern) == 1 and home_dir then
+				expanded_mark_path = home_dir .. string.sub(mark_file_path, 2)
+				-- vim.notify("Expanded mark path: " .. expanded_mark_path, vim.log.levels.INFO, { title = "marko.nvim" })
+			end
+
+			-- Multiple ways to check for path match:
+
+			-- 1. Check with expanded paths (absolute paths)
+			if string.sub(expanded_mark_path, 1, #normalized_project_path) == normalized_project_path then
 				in_project = true
-			-- Alternative test using direct string prefix for exact path
-			elseif string.sub(mark_file_path, 1, #project_path) == project_path then
-				-- Secondary check for files directly in the root of the project (no trailing slash)
+				-- vim.notify(
+				-- 	"Mark " .. mark .. " matches with expanded path",
+				-- 	vim.log.levels.INFO,
+				-- 	{ title = "marko.nvim" }
+				-- )
+
+				-- 2. Check if the path starts with the tilde-based project path (for marks with tilde paths)
+			elseif string.sub(mark_file_path, 1, #normalized_tilde_path) == normalized_tilde_path then
 				in_project = true
+				-- vim.notify(
+				-- 	"Mark " .. mark .. " matches with tilde normalized path",
+				-- 	vim.log.levels.INFO,
+				-- 	{ title = "marko.nvim" }
+				-- )
+
+				-- 3. Check for exact tilde path match (no trailing slash)
+			elseif string.sub(mark_file_path, 1, #tilde_project_path) == tilde_project_path then
+				in_project = true
+				-- vim.notify("Mark " .. mark .. " matches with tilde path", vim.log.levels.INFO, { title = "marko.nvim" })
+
+				-- 4. Check for case where mark path is partially expanded
+			elseif project_path:sub(-#mark_file_path) == mark_file_path then
+				in_project = true
+				-- vim.notify(
+				-- 	"Mark " .. mark .. " matches with partial path",
+				-- 	vim.log.levels.INFO,
+				-- 	{ title = "marko.nvim" }
+				-- )
+
+				-- 5. Check for exact project path match (no trailing slash)
+			elseif string.sub(expanded_mark_path, 1, #project_path) == project_path then
+				in_project = true
+				-- vim.notify(
+				-- 	"Mark " .. mark .. " matches with project path",
+				-- 	vim.log.levels.INFO,
+				-- 	{ title = "marko.nvim" }
+				-- )
+
+				-- 6. Special case: check if the mark path is within a subdirectory of the project
+			elseif string.find(expanded_mark_path, normalized_project_path, 1, true) then
+				in_project = true
+				-- vim.notify(
+				-- 	"Mark " .. mark .. " is in a subdirectory of the project",
+				-- 	vim.log.levels.INFO,
+				-- 	{ title = "marko.nvim" }
+				-- )
+			elseif string.find(mark_file_path, normalized_tilde_path, 1, true) then
+				in_project = true
+				-- vim.notify(
+				-- 	"Mark " .. mark .. " is in a tilde subdirectory of the project",
+				-- 	vim.log.levels.INFO,
+				-- 	{ title = "marko.nvim" }
+				-- )
 			end
 		end
 
 		if valid and in_project then
 			table.insert(filtered_marks, mark)
+			-- vim.notify("Added mark " .. mark .. " to filtered marks", vim.log.levels.INFO, { title = "marko.nvim" })
+		else
+			-- if not valid then
+			-- 	vim.notify("Mark " .. mark .. " is not valid", vim.log.levels.INFO, { title = "marko.nvim" })
+			-- elseif not in_project then
+			-- 	vim.notify(
+			-- 		"Mark " .. mark .. " is not in the current project",
+			-- 		vim.log.levels.INFO,
+			-- 		{ title = "marko.nvim" }
+			-- 	)
+			-- end
 		end
 	end
 
+	-- vim.notify(
+	-- 	"Found " .. #filtered_marks .. " marks for the current project",
+	-- 	vim.log.levels.INFO,
+	-- 	{ title = "marko.nvim" }
+	-- )
 	return filtered_marks
 end
 
@@ -307,6 +410,15 @@ end
 function M.save_directory_marks(config_path, directory_path)
 	directory_path = directory_path or vim.fn.getcwd()
 
+	-- vim.notify("Save called for directory: " .. directory_path, vim.log.levels.INFO, { title = "marko.nvim" })
+	-- vim.notify("Config path: " .. config_path, vim.log.levels.INFO, { title = "marko.nvim" })
+
+	-- Ensure we have valid directory_path
+	if not directory_path or directory_path == "" then
+		directory_path = vim.fn.getcwd()
+		-- vim.notify("Using current directory instead: " .. directory_path, vim.log.levels.INFO, { title = "marko.nvim" })
+	end
+
 	-- Step 1: Ensure config file exists
 	local exists = M.check_path(config_path)
 	if not exists then
@@ -352,6 +464,11 @@ function M.save_directory_marks(config_path, directory_path)
 
 	-- Step 4: Get current marks for this directory
 	local curr_marks = M.filter_marks(directory_path)
+	-- vim.notify(
+	-- 	"Found " .. #curr_marks .. " marks for directory: " .. directory_path,
+	-- 	vim.log.levels.INFO,
+	-- 	{ title = "marko.nvim" }
+	-- )
 
 	-- Step 5: Update the config with current directory marks while preserving other directories
 	local updated_content = M.update_config(parsed_config, directory_path, curr_marks)
@@ -362,6 +479,12 @@ function M.save_directory_marks(config_path, directory_path)
 		vim.notify("Error saving directory marks: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
 		return nil, err
 	end
+
+	-- vim.notify(
+	-- 	"Successfully saved " .. #curr_marks .. " marks for directory: " .. directory_path,
+	-- 	vim.log.levels.INFO,
+	-- 	{ title = "marko.nvim" }
+	-- )
 
 	-- Return the updated parsed config
 	local new_config = M.parse_config(updated_content)

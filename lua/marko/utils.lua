@@ -18,6 +18,85 @@ function M.get(tbl, key, default)
 	return value
 end
 
+-- Helper function to properly set a global mark (capital letter)
+-- @param mark The mark to set (A-Z)
+-- @param row Row position (1-based)
+-- @param col Column position (0-based)
+-- @param buffer Buffer number
+-- @param filename Full path to the file
+-- @return Boolean indicating if mark was set successfully
+function M.set_global_mark(mark, row, col, buffer, filename)
+	-- Validate mark is a capital letter
+	if not mark:match("^%u$") then
+		vim.notify("Invalid mark: " .. mark .. " (must be A-Z)", vim.log.levels.ERROR, { title = "marko.nvim" })
+		return false
+	end
+
+	-- Ensure row and col are numbers
+	row = tonumber(row) or 1
+	col = tonumber(col) or 0
+	
+	-- Expand tilde in path if present
+	local expanded_filename = filename
+	if filename:match("^~/") then
+		local home_dir = os.getenv("HOME")
+		if home_dir then
+			expanded_filename = home_dir .. filename:sub(2)
+			vim.notify("Expanded filename from " .. filename .. " to " .. expanded_filename, 
+				vim.log.levels.INFO, { title = "marko.nvim" })
+		end
+	end
+	
+	-- Use Neovim's API to create a buffer if needed
+	if buffer == 0 or not vim.api.nvim_buf_is_valid(buffer) then
+		-- Check if file exists
+		if vim.fn.filereadable(expanded_filename) == 0 then
+			vim.notify("File not found: " .. expanded_filename, vim.log.levels.WARN, { title = "marko.nvim" })
+			return false
+		end
+		
+		-- Create a new buffer
+		buffer = vim.fn.bufadd(expanded_filename)
+		if buffer == 0 then
+			vim.notify("Failed to create buffer for: " .. expanded_filename, vim.log.levels.ERROR, { title = "marko.nvim" })
+			return false
+		end
+	end
+	
+	-- Set the mark - use correct API based on Neovim version
+	local success = false
+	
+	-- Neovim 0.10+ has a global nvim_set_mark function
+	if vim.fn.has('nvim-0.10') == 1 and vim.api.nvim_set_mark then
+		success = vim.api.nvim_set_mark(mark, row, col, {})
+	else
+		-- For older Neovim versions, use buffer-specific mark setting
+		success = vim.api.nvim_buf_set_mark(buffer, mark, row, col, {})
+	end
+	
+	if success then
+		vim.notify(
+			"Successfully set global mark " .. mark .. " for " .. filename,
+			vim.log.levels.INFO,
+			{ title = "marko.nvim" }
+		)
+		
+		-- Double-check mark was set correctly
+		local check = vim.api.nvim_get_mark(mark, {})
+		if check and check[4] then
+			vim.notify(
+				"Mark " .. mark .. " set at " .. (check[4] or "unknown"),
+				vim.log.levels.INFO,
+				{ title = "marko.nvim" }
+			)
+		end
+	else
+		vim.notify("Failed to set mark " .. mark .. " for " .. filename, vim.log.levels.ERROR, { title = "marko.nvim" })
+	end
+	
+	return success
+end
+
 -- Safely navigate a nested table structure using a list of keys
 -- @param tbl The table to traverse
 -- @param keys A list of keys to navigate through the table

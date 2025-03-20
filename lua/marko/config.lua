@@ -38,20 +38,40 @@ function M.clear_all_marks()
 end
 
 -- Function to save the current directory's marks
-function M.save_current_marks()
+function M.save_current_marks(force)
 	local cwd = vim.fn.getcwd()
+
+	-- Debug output start
+	-- vim.notify("Saving marks for directory: " .. cwd, vim.log.levels.INFO, { title = "marko.nvim" })
+	-- Debug output end
 
 	-- Get marks for current directory
 	local curr_marks = file.filter_marks(cwd)
 
+	-- Debug output start
+	-- vim.notify("Found " .. #curr_marks .. " marks for current directory", vim.log.levels.INFO, { title = "marko.nvim" })
 	if #curr_marks > 0 then
+		local marks_list = table.concat(curr_marks, ", ")
+		-- vim.notify("Marks: " .. marks_list, vim.log.levels.INFO, { title = "marko.nvim" })
+	end
+	-- Debug output end
+
+	-- Check if we should proceed (force=true or marks exist)
+	if force or #curr_marks > 0 then
+		-- Ensure the config directory exists
+		local config_dir = vim.fn.fnamemodify(marks_path, ":h")
+		if vim.fn.isdirectory(config_dir) == 0 then
+			vim.fn.mkdir(config_dir, "p")
+			-- vim.notify("Created config directory: " .. config_dir, vim.log.levels.INFO, { title = "marko.nvim" })
+		end
+
 		-- Call file.save_directory_marks directly which will handle the saving
 		local result, err = file.save_directory_marks(marks_path, cwd)
 
 		if result then
 			-- Update our local cache with the result from file.save_directory_marks
 			config_cache = result
-
+			-- vim.notify("Successfully saved marks to " .. marks_path, vim.log.levels.INFO, { title = "marko.nvim" })
 			return true
 		else
 			vim.notify(
@@ -62,6 +82,11 @@ function M.save_current_marks()
 			return false
 		end
 	else
+		-- vim.notify(
+		-- 	"No marks found for current directory, nothing to save",
+		-- 	vim.log.levels.WARN,
+		-- 	{ title = "marko.nvim" }
+		-- )
 		return false
 	end
 end
@@ -85,6 +110,7 @@ end
 -- Set marks from the config for the current directory
 function M.set_marks_from_config()
 	local cwd = vim.fn.getcwd()
+	local utils = require("marko.utils")
 
 	-- Ensure we have a loaded config
 	if not config_cache then
@@ -93,11 +119,18 @@ function M.set_marks_from_config()
 
 	-- Check if we have marks for this directory
 	if not config_cache or not config_cache[cwd] or #config_cache[cwd] == 0 then
+		-- vim.notify("No marks found in config for directory: " .. cwd, vim.log.levels.INFO, { title = "marko.nvim" })
 		return false
 	end
 
 	local dir_marks = config_cache[cwd]
 	local set_count = 0
+
+	-- vim.notify(
+	-- 	"Setting " .. #dir_marks .. " marks from config for directory: " .. cwd,
+	-- 	vim.log.levels.INFO,
+	-- 	{ title = "marko.nvim" }
+	-- )
 
 	-- Set each mark from the config
 	for _, mark_data in ipairs(dir_marks) do
@@ -106,59 +139,31 @@ function M.set_marks_from_config()
 			local file_exists = vim.fn.filereadable(mark_data.filename) == 1
 
 			if file_exists then
-				-- Use the built-in Neovim method that properly handles file type detection
-				local buffer
+				-- Use our utility function to set the global mark
+				local success = utils.set_global_mark(
+					mark_data.mark,
+					mark_data.row,
+					mark_data.col or 0,
+					mark_data.buffer or 0,
+					mark_data.filename
+				)
 
-				-- Try to find if the buffer is already loaded
-				for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-					if vim.api.nvim_buf_get_name(buf) == mark_data.filename then
-						buffer = buf
-						break
-					end
+				if success then
+					set_count = set_count + 1
 				end
-
-				-- If buffer isn't already loaded, create it properly with filetype detection
-				if not buffer then
-					buffer = vim.fn.bufadd(mark_data.filename)
-					if buffer ~= 0 then
-						-- Load the buffer with filetype detection
-						vim.fn.bufload(buffer)
-
-						-- Force filetype detection to ensure syntax highlighting
-						vim.api.nvim_command("doautocmd BufRead " .. vim.fn.fnameescape(mark_data.filename))
-
-						-- Get the filetype based on the filename and set it explicitly
-						local filetype = vim.filetype.match({ filename = mark_data.filename })
-						if filetype then
-							vim.api.nvim_set_option_value("filetype", filetype, { buf = buffer })
-						end
-					end
-				end
-
-				if buffer == 0 then
-					vim.notify(
-						"Failed to get buffer for file: " .. mark_data.filename,
-						vim.log.levels.WARN,
-						{ title = "marko.nvim" }
-					)
-				else
-					-- Set the mark using nvim_buf_set_mark
-					local success =
-						vim.api.nvim_buf_set_mark(buffer, mark_data.mark, mark_data.row, mark_data.col or 0, {})
-
-					if success then
-						set_count = set_count + 1
-					else
-						vim.notify(
-							"Failed to set mark " .. mark_data.mark .. " at " .. mark_data.filename,
-							vim.log.levels.WARN,
-							{ title = "marko.nvim" }
-						)
-					end
-				end
+			else
+				vim.notify("File not found: " .. mark_data.filename, vim.log.levels.WARN, { title = "marko.nvim" })
 			end
+		else
+			vim.notify("Invalid mark data: missing required fields", vim.log.levels.WARN, { title = "marko.nvim" })
 		end
 	end
+
+	vim.notify(
+		"Successfully set " .. set_count .. " out of " .. #dir_marks .. " marks",
+		vim.log.levels.INFO,
+		{ title = "marko.nvim" }
+	)
 
 	return set_count > 0
 end
@@ -242,7 +247,7 @@ end
 function M.setup(opts)
 	-- Create user command to manually save marks
 	vim.api.nvim_create_user_command("MarkoSave", function()
-		M.save_current_marks()
+		M.save_current_marks(true)
 	end, { desc = "Save marks for current directory" })
 
 	-- Add a command to clear and reload marks
@@ -273,6 +278,104 @@ function M.setup(opts)
 		end)
 	end, { desc = "Delete the marks config file" })
 
+	-- Add debug command to check all marks
+	vim.api.nvim_create_user_command("MarkoDebug", function()
+		local cwd = vim.fn.getcwd()
+		vim.notify("Current directory: " .. cwd, vim.log.levels.INFO, { title = "marko.nvim" })
+
+		-- Print all marks
+		vim.notify("=== All Marks ===", vim.log.levels.INFO, { title = "marko.nvim" })
+		for _, mark in ipairs(marks) do
+			local content = vim.api.nvim_get_mark(mark, {})
+			local row = content[1] or 0
+			local col = content[2] or 0
+			local buf = content[3] or 0
+			local file_path = content[4] or ""
+
+			if row > 0 and file_path ~= "" then
+				vim.notify(
+					string.format("Mark %s: row=%d, col=%d, buf=%d, file=%s", mark, row, col, buf, file_path),
+					vim.log.levels.INFO,
+					{ title = "marko.nvim" }
+				)
+			end
+		end
+
+		-- Print filtered marks
+		local filtered = file.filter_marks(cwd)
+		vim.notify(
+			string.format("=== Filtered Marks (%d) ===", #filtered),
+			vim.log.levels.INFO,
+			{ title = "marko.nvim" }
+		)
+		for _, mark in ipairs(filtered) do
+			local content = vim.api.nvim_get_mark(mark, {})
+			vim.notify(
+				string.format("Filtered mark %s: %s", mark, content[4] or ""),
+				vim.log.levels.INFO,
+				{ title = "marko.nvim" }
+			)
+		end
+
+		-- Print config file path
+		vim.notify("Config file path: " .. marks_path, vim.log.levels.INFO, { title = "marko.nvim" })
+
+		-- Check if config file exists
+		if file.check_path(marks_path) then
+			local content = file.read_file(marks_path)
+			if content and content ~= "" then
+				vim.notify("Config file content:\n" .. content, vim.log.levels.INFO, { title = "marko.nvim" })
+				local parsed = file.parse_config(content)
+				if parsed and type(parsed) == "table" then
+					for dir, marks_list in pairs(parsed) do
+						vim.notify(
+							string.format("Directory: %s, Marks: %d", dir, #marks_list),
+							vim.log.levels.INFO,
+							{ title = "marko.nvim" }
+						)
+					end
+				end
+			else
+				vim.notify("Config file is empty", vim.log.levels.INFO, { title = "marko.nvim" })
+			end
+		else
+			vim.notify("Config file does not exist", vim.log.levels.INFO, { title = "marko.nvim" })
+		end
+	end, { desc = "Debug marks information" })
+
+	-- Add command to manually set a mark for the current file
+	vim.api.nvim_create_user_command("MarkoMark", function(args)
+		local utils = require("marko.utils")
+		local mark = args.args
+
+		-- Validate mark is provided and is a capital letter
+		if not mark or not mark:match("^%u$") then
+			vim.notify("Please provide a valid mark (A-Z)", vim.log.levels.ERROR, { title = "marko.nvim" })
+			return
+		end
+
+		-- Get current buffer, cursor position, and file path
+		local buffer = vim.api.nvim_get_current_buf()
+		local cursor = vim.api.nvim_win_get_cursor(0)
+		local row = cursor[1]
+		local col = cursor[2]
+		local filename = vim.api.nvim_buf_get_name(buffer)
+
+		if filename == "" then
+			vim.notify("Cannot set mark on unnamed buffer", vim.log.levels.ERROR, { title = "marko.nvim" })
+			return
+		end
+
+		-- Set the global mark
+		local success = utils.set_global_mark(mark, row, col, buffer, filename)
+
+		if success then
+			vim.notify("Mark '" .. mark .. "' set for current file", vim.log.levels.INFO, { title = "marko.nvim" })
+			-- Save marks immediately
+			M.save_current_marks(true)
+		end
+	end, { nargs = 1, desc = "Set a mark for the current file" })
+
 	-- Initialize when Neovim starts - clear all marks and load from config
 	vim.api.nvim_create_autocmd("UIEnter", {
 		callback = function()
@@ -298,11 +401,12 @@ function M.setup(opts)
 		end,
 	})
 
-	-- Save marks when Neovim exits
-	vim.api.nvim_create_autocmd("QuitPre", {
+	-- Save marks when Neovim exits - use multiple events to ensure saving happens
+	vim.api.nvim_create_autocmd({ "QuitPre", "VimLeavePre", "VimLeave" }, {
 		callback = function()
-			M.save_current_marks()
+			M.save_current_marks(true)
 		end,
+		group = vim.api.nvim_create_augroup("MarkoSaveOnExit", { clear = true }),
 	})
 
 	-- Also save marks on buffer write, but throttle it to avoid too many writes
