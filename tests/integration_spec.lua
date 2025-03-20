@@ -57,7 +57,6 @@ describe("marko integration", function()
 		it("should handle custom options", function()
 			-- Create a custom options table
 			local opts = {
-				auto_save = true,
 				debug = true,
 			}
 
@@ -66,7 +65,6 @@ describe("marko integration", function()
 
 			-- Options should be stored in the module
 			assert.is_not_nil(marko.options)
-			assert.is_true(marko.options.auto_save)
 			assert.is_true(marko.options.debug)
 		end)
 	end)
@@ -169,4 +167,3 @@ describe("marko integration", function()
 		end)
 	end)
 end)
-

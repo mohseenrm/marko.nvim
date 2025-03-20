@@ -4,7 +4,6 @@ local M = {}
 
 -- Store options for the plugin
 M.options = {
-	auto_save = false,
 	debug = false,
 }
 
