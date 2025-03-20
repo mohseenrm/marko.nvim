@@ -34,11 +34,9 @@ function M.tokenize(content)
 		table.insert(lines, line)
 	end
 
-	for i, line in ipairs(lines) do
+	for idx, line in ipairs(lines) do
 		-- Skip empty lines and comments
-		if line:match("^%s*$") or line:match("^%s*#") then
-			-- Skip
-		else
+		if not (line:match("^%s*$") or line:match("^%s*#")) then
 			local indent = line:match("^(%s*)")
 			local stripped = line:match("^%s*(.*)$")
 			local key, value = stripped:match("^([^:]+):%s*(.*)$")
@@ -61,7 +59,7 @@ function M.tokenize(content)
 					value = parsed_value,
 					raw_value = trimmed_value,
 					indent = #indent,
-					line = i,
+					line = idx,
 					raw = line,
 				})
 			elseif stripped:match("^-%s+(.+)$") then
@@ -75,7 +73,7 @@ function M.tokenize(content)
 					value = parsed_item,
 					raw_value = trimmed_item,
 					indent = #indent,
-					line = i,
+					line = idx,
 					raw = line,
 				})
 			elseif stripped:match("^-$") then
@@ -85,7 +83,7 @@ function M.tokenize(content)
 					value = nil,
 					raw_value = "",
 					indent = #indent,
-					line = i,
+					line = idx,
 					raw = line,
 				})
 			else
@@ -96,7 +94,7 @@ function M.tokenize(content)
 					value = parsed_value,
 					raw_value = stripped,
 					indent = #indent,
-					line = i,
+					line = idx,
 					raw = line,
 				})
 			end
@@ -117,7 +115,7 @@ function M.eval(content)
 	local list_mode = false
 	local list_key = nil
 
-	for i, token in ipairs(tokens) do
+	for _, token in ipairs(tokens) do
 		local token_type = token[1]
 
 		if token_type == "KEY_VALUE" then
@@ -206,3 +204,4 @@ function M.parse_string(yaml_string)
 end
 
 return M
+

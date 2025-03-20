@@ -1,18 +1,18 @@
 -- Relaxed Luacheck configuration for Neovim plugins
-std = {
-  max_line_length = false,
-  -- Globals for Neovim Lua API
-  globals = {
-    "vim",
-    "assert",
-    "describe",
-    "it",
-    "before_each",
-    "after_each",
-  },
+std = "lua51"
+
+-- Define Neovim global
+globals = {
+  "vim",
+  -- For tests
+  "assert",
+  "describe",
+  "it",
+  "before_each",
+  "after_each",
 }
 
--- Ignore warnings for unused self parameters in methods, common in OOP
+-- Don't report unused self parameters of methods
 self = false
 
 -- Files to exclude
@@ -24,4 +24,9 @@ exclude_files = {
 ignore = {
   "212", -- Unused argument
   "631", -- Line too long
+}
+
+-- Allow accessing globals defined in vim namespace
+read_globals = {
+  "vim",
 }

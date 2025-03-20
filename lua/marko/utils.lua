@@ -1,3 +1,6 @@
+-- Import globals to fix luacheck warnings
+require("marko.globals")
+
 local M = {}
 
 -- Get a value from a table, with an optional default value if the key doesn't exist
@@ -66,15 +69,11 @@ function M.set_global_mark(mark, row, col, buffer, filename)
 		end
 	end
 
-	-- Set the mark - use correct API based on Neovim version
-	local success = false
-
 	-- Load the buffer to ensure we can get line count
 	vim.fn.bufload(buffer)
 
 	-- Get total number of lines in the buffer
 	local line_count = vim.api.nvim_buf_line_count(buffer)
-
 	-- Ensure row is within valid range (1 to line_count)
 	if row < 1 or row > line_count then
 		M.log(
@@ -94,35 +93,28 @@ function M.set_global_mark(mark, row, col, buffer, filename)
 		row = 1
 	end
 
+	local mark_set
 	-- Neovim 0.10+ has a global nvim_set_mark function
 	if vim.fn.has("nvim-0.10") == 1 and vim.api.nvim_set_mark then
-		success = vim.api.nvim_set_mark(mark, row, col, {})
+		mark_set = vim.api.nvim_set_mark(mark, row, col, {})
 	else
 		-- For older Neovim versions, use buffer-specific mark setting
-		success = vim.api.nvim_buf_set_mark(buffer, mark, row, col, {})
+		mark_set = vim.api.nvim_buf_set_mark(buffer, mark, row, col, {})
 	end
 
-	if success then
-		M.log(
-			"Successfully set global mark " .. mark .. " for " .. filename,
-			vim.log.levels.INFO,
-			{ title = "marko.nvim" }
-		)
+	if mark_set then
+		M.log("Successfully set global mark " .. mark .. " for " .. filename, vim.log.levels.INFO, { title = "marko.nvim" })
 
 		-- Double-check mark was set correctly
 		local check = vim.api.nvim_get_mark(mark, {})
 		if check and check[4] then
-			M.log(
-				"Mark " .. mark .. " set at " .. (check[4] or "unknown"),
-				vim.log.levels.INFO,
-				{ title = "marko.nvim" }
-			)
+			M.log("Mark " .. mark .. " set at " .. (check[4] or "unknown"), vim.log.levels.INFO, { title = "marko.nvim" })
 		end
 	else
 		M.log("Failed to set mark " .. mark .. " for " .. filename, vim.log.levels.ERROR, { title = "marko.nvim" })
 	end
 
-	return success
+	return mark_set
 end
 
 -- Safely navigate a nested table structure using a list of keys
@@ -174,3 +166,4 @@ function M.log(message, level, opts)
 end
 
 return M
+

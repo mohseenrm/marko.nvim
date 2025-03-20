@@ -1,3 +1,5 @@
+require("marko.globals")
+
 local file = require("marko.file")
 
 local M = {}
@@ -75,19 +77,11 @@ function M.save_current_marks(force)
 			utils.log("Successfully saved marks to " .. marks_path, vim.log.levels.INFO, { title = "marko.nvim" })
 			return true
 		else
-			utils.log(
-				"Error saving marks: " .. (err or "unknown error"),
-				vim.log.levels.ERROR,
-				{ title = "marko.nvim" }
-			)
+			utils.log("Error saving marks: " .. (err or "unknown error"), vim.log.levels.ERROR, { title = "marko.nvim" })
 			return false
 		end
 	else
-		utils.log(
-			"No marks found for current directory, nothing to save",
-			vim.log.levels.WARN,
-			{ title = "marko.nvim" }
-		)
+		utils.log("No marks found for current directory, nothing to save", vim.log.levels.WARN, { title = "marko.nvim" })
 		return false
 	end
 end
@@ -326,11 +320,7 @@ function M.setup(opts)
 
 		-- Print filtered marks
 		local filtered = file.filter_marks(cwd)
-		vim.notify(
-			string.format("=== Filtered Marks (%d) ===", #filtered),
-			vim.log.levels.INFO,
-			{ title = "marko.nvim" }
-		)
+		vim.notify(string.format("=== Filtered Marks (%d) ===", #filtered), vim.log.levels.INFO, { title = "marko.nvim" })
 		for _, mark in ipairs(filtered) do
 			local content = vim.api.nvim_get_mark(mark, {})
 			vim.notify(
@@ -450,3 +440,4 @@ function M.setup(opts)
 end
 
 return M
+

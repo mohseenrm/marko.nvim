@@ -1,3 +1,5 @@
+require("marko.globals")
+
 local M = {}
 
 local marks = {}
@@ -71,83 +73,31 @@ function M.filter_marks(project_path)
 			-- 1. Check with expanded paths (absolute paths)
 			if string.sub(expanded_mark_path, 1, #normalized_project_path) == normalized_project_path then
 				in_project = true
-				-- vim.notify(
-				-- 	"Mark " .. mark .. " matches with expanded path",
-				-- 	vim.log.levels.INFO,
-				-- 	{ title = "marko.nvim" }
-				-- )
-
-				-- 2. Check if the path starts with the tilde-based project path (for marks with tilde paths)
+			-- 2. Check if the path starts with the tilde-based project path (for marks with tilde paths)
 			elseif string.sub(mark_file_path, 1, #normalized_tilde_path) == normalized_tilde_path then
 				in_project = true
-				-- vim.notify(
-				-- 	"Mark " .. mark .. " matches with tilde normalized path",
-				-- 	vim.log.levels.INFO,
-				-- 	{ title = "marko.nvim" }
-				-- )
-
-				-- 3. Check for exact tilde path match (no trailing slash)
+			-- 3. Check for exact tilde path match (no trailing slash)
 			elseif string.sub(mark_file_path, 1, #tilde_project_path) == tilde_project_path then
 				in_project = true
-				-- vim.notify("Mark " .. mark .. " matches with tilde path", vim.log.levels.INFO, { title = "marko.nvim" })
-
-				-- 4. Check for case where mark path is partially expanded
+			-- 4. Check for case where mark path is partially expanded
 			elseif project_path:sub(-#mark_file_path) == mark_file_path then
 				in_project = true
-				-- vim.notify(
-				-- 	"Mark " .. mark .. " matches with partial path",
-				-- 	vim.log.levels.INFO,
-				-- 	{ title = "marko.nvim" }
-				-- )
-
-				-- 5. Check for exact project path match (no trailing slash)
+			-- 5. Check for exact project path match (no trailing slash)
 			elseif string.sub(expanded_mark_path, 1, #project_path) == project_path then
 				in_project = true
-				-- vim.notify(
-				-- 	"Mark " .. mark .. " matches with project path",
-				-- 	vim.log.levels.INFO,
-				-- 	{ title = "marko.nvim" }
-				-- )
-
-				-- 6. Special case: check if the mark path is within a subdirectory of the project
+			-- 6. Special case: check if the mark path is within a subdirectory of the project
 			elseif string.find(expanded_mark_path, normalized_project_path, 1, true) then
 				in_project = true
-				-- vim.notify(
-				-- 	"Mark " .. mark .. " is in a subdirectory of the project",
-				-- 	vim.log.levels.INFO,
-				-- 	{ title = "marko.nvim" }
-				-- )
 			elseif string.find(mark_file_path, normalized_tilde_path, 1, true) then
 				in_project = true
-				-- vim.notify(
-				-- 	"Mark " .. mark .. " is in a tilde subdirectory of the project",
-				-- 	vim.log.levels.INFO,
-				-- 	{ title = "marko.nvim" }
-				-- )
 			end
 		end
 
 		if valid and in_project then
 			table.insert(filtered_marks, mark)
-			-- vim.notify("Added mark " .. mark .. " to filtered marks", vim.log.levels.INFO, { title = "marko.nvim" })
-		else
-			-- if not valid then
-			-- 	vim.notify("Mark " .. mark .. " is not valid", vim.log.levels.INFO, { title = "marko.nvim" })
-			-- elseif not in_project then
-			-- 	vim.notify(
-			-- 		"Mark " .. mark .. " is not in the current project",
-			-- 		vim.log.levels.INFO,
-			-- 		{ title = "marko.nvim" }
-			-- 	)
-			-- end
 		end
 	end
 
-	-- vim.notify(
-	-- 	"Found " .. #filtered_marks .. " marks for the current project",
-	-- 	vim.log.levels.INFO,
-	-- 	{ title = "marko.nvim" }
-	-- )
 	return filtered_marks
 end
 
@@ -170,13 +120,10 @@ function M.parse_config(content)
 		table.insert(lines, line)
 	end
 
-	for i, line in ipairs(lines) do
+	-- Use _ instead of i to silence unused loop variable warning
+	for _, line in ipairs(lines) do
 		-- Skip empty lines and comments
-		if line:match("^%s*$") then
-			-- Skip empty lines, but preserve context
-		elseif line:match("^%s*#") then
-			-- Skip comments, but preserve context
-		else
+		if not (line:match("^%s*$") or line:match("^%s*#")) then
 			-- Check if this is a directory line (ends with colon and doesn't have indent)
 			local dir = line:match("^([^%s][^:]+):$")
 			if dir then
@@ -265,16 +212,16 @@ function M.create_path(path)
 	local parent = path:match("(.*/)")
 	local mkdir_cmd = string.format("mkdir -p %s", parent)
 
-	local result = os.execute(mkdir_cmd)
-	if result ~= 0 then
-		return nil, "Failed to create path, err: " .. result
+	local mkdir_result = os.execute(mkdir_cmd)
+	if mkdir_result ~= 0 then
+		return nil, "Failed to create path, err: " .. mkdir_result
 	end
 
 	local touch_cmd = string.format("touch %s", path)
-	local result = os.execute(touch_cmd)
+	local touch_result = os.execute(touch_cmd)
 
-	if result ~= 0 then
-		return nil, "Failed to create path, err: " .. result
+	if touch_result ~= 0 then
+		return nil, "Failed to create path, err: " .. touch_result
 	end
 	return true
 end
@@ -392,7 +339,7 @@ function M.update_config(existing_config, cwd, marks_to_save)
 	for _, mark in ipairs(marks_to_save) do
 		local content = vim.api.nvim_get_mark(mark, {})
 		if content and content[1] then
-			local line_number = content[1]
+			-- Don't use line_number variable, directly use content[1]
 			table.insert(updated_config[cwd], {
 				mark = mark,
 				row = content[1],
@@ -425,29 +372,29 @@ function M.save_directory_marks(config_path, directory_path)
 	local exists = M.check_path(config_path)
 	if not exists then
 		-- Create config file first
-		local success, err = M.create_path(config_path)
-		if not success then
-			utils.log("Error creating config file path: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
-			return nil, err
+		local create_success, create_err = M.create_path(config_path)
+		if not create_success then
+			utils.log("Error creating config file path: " .. create_err, vim.log.levels.ERROR, { title = "marko.nvim" })
+			return nil, create_err
 		end
 
 		-- Initialize with empty content
-		local success, err = M.write_file(config_path, "")
-		if not success then
-			utils.log("Error initializing config file: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
-			return nil, err
+		local write_success, write_err = M.write_file(config_path, "")
+		if not write_success then
+			utils.log("Error initializing config file: " .. write_err, vim.log.levels.ERROR, { title = "marko.nvim" })
+			return nil, write_err
 		end
 	end
 
 	-- Step 2: Read existing config
-	local content, err = M.read_file(config_path)
+	local content, read_err = M.read_file(config_path)
 	if not content then
 		utils.log(
-			"Error reading config file: " .. (err or "unknown error"),
+			"Error reading config file: " .. (read_err or "unknown error"),
 			vim.log.levels.ERROR,
 			{ title = "marko.nvim" }
 		)
-		return nil, err
+		return nil, read_err
 	end
 
 	-- Step 3: Parse the config safely
@@ -476,10 +423,10 @@ function M.save_directory_marks(config_path, directory_path)
 	local updated_content = M.update_config(parsed_config, directory_path, curr_marks)
 
 	-- Step 6: Write the updated config back to file
-	local success, err = M.write_file(config_path, updated_content)
-	if not success then
-		utils.log("Error saving directory marks: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
-		return nil, err
+	local write_success, write_err = M.write_file(config_path, updated_content)
+	if not write_success then
+		utils.log("Error saving directory marks: " .. write_err, vim.log.levels.ERROR, { title = "marko.nvim" })
+		return nil, write_err
 	end
 
 	utils.log(
@@ -503,6 +450,9 @@ function M.get_config(path)
 	if res then
 		-- read and parse content
 		local content, err = M.read_file(path)
+		if err then
+			utils.log("Error reading config: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
+		end
 
 		if not content or content == "" then
 			-- Empty or invalid file, create a new one with current directory marks
@@ -536,3 +486,4 @@ function M.get_config(path)
 end
 
 return M
+

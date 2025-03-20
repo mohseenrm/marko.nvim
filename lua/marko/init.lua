@@ -1,3 +1,6 @@
+-- Import globals to fix luacheck warnings
+require("marko.globals")
+
 local config = require("marko.config")
 
 local M = {}
