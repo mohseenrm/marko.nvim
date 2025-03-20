@@ -40,19 +40,20 @@ end
 -- Function to save the current directory's marks
 function M.save_current_marks(force)
 	local cwd = vim.fn.getcwd()
+	local utils = require("marko.utils")
 
 	-- Debug output start
-	-- vim.notify("Saving marks for directory: " .. cwd, vim.log.levels.INFO, { title = "marko.nvim" })
+	utils.log("Saving marks for directory: " .. cwd, vim.log.levels.INFO, { title = "marko.nvim" })
 	-- Debug output end
 
 	-- Get marks for current directory
 	local curr_marks = file.filter_marks(cwd)
 
 	-- Debug output start
-	-- vim.notify("Found " .. #curr_marks .. " marks for current directory", vim.log.levels.INFO, { title = "marko.nvim" })
+	utils.log("Found " .. #curr_marks .. " marks for current directory", vim.log.levels.INFO, { title = "marko.nvim" })
 	if #curr_marks > 0 then
 		local marks_list = table.concat(curr_marks, ", ")
-		-- vim.notify("Marks: " .. marks_list, vim.log.levels.INFO, { title = "marko.nvim" })
+		utils.log("Marks: " .. marks_list, vim.log.levels.INFO, { title = "marko.nvim" })
 	end
 	-- Debug output end
 
@@ -62,7 +63,7 @@ function M.save_current_marks(force)
 		local config_dir = vim.fn.fnamemodify(marks_path, ":h")
 		if vim.fn.isdirectory(config_dir) == 0 then
 			vim.fn.mkdir(config_dir, "p")
-			-- vim.notify("Created config directory: " .. config_dir, vim.log.levels.INFO, { title = "marko.nvim" })
+			utils.log("Created config directory: " .. config_dir, vim.log.levels.INFO, { title = "marko.nvim" })
 		end
 
 		-- Call file.save_directory_marks directly which will handle the saving
@@ -71,10 +72,10 @@ function M.save_current_marks(force)
 		if result then
 			-- Update our local cache with the result from file.save_directory_marks
 			config_cache = result
-			-- vim.notify("Successfully saved marks to " .. marks_path, vim.log.levels.INFO, { title = "marko.nvim" })
+			utils.log("Successfully saved marks to " .. marks_path, vim.log.levels.INFO, { title = "marko.nvim" })
 			return true
 		else
-			vim.notify(
+			utils.log(
 				"Error saving marks: " .. (err or "unknown error"),
 				vim.log.levels.ERROR,
 				{ title = "marko.nvim" }
@@ -82,11 +83,11 @@ function M.save_current_marks(force)
 			return false
 		end
 	else
-		-- vim.notify(
-		-- 	"No marks found for current directory, nothing to save",
-		-- 	vim.log.levels.WARN,
-		-- 	{ title = "marko.nvim" }
-		-- )
+		utils.log(
+			"No marks found for current directory, nothing to save",
+			vim.log.levels.WARN,
+			{ title = "marko.nvim" }
+		)
 		return false
 	end
 end
@@ -152,7 +153,7 @@ function M.set_marks_from_config()
 					set_count = set_count + 1
 				end
 			else
-				vim.notify("File not found: " .. mark_data.filename, vim.log.levels.WARN, { title = "marko.nvim" })
+				utils.log("File not found: " .. mark_data.filename, vim.log.levels.WARN, { title = "marko.nvim" })
 			end
 		else
 			vim.notify("Invalid mark data: missing required fields", vim.log.levels.WARN, { title = "marko.nvim" })

@@ -9,6 +9,7 @@ end
 function M.filter_marks(project_path)
 	-- enumerate over marks, check if valid and if starts with project_path
 	local filtered_marks = {}
+	local utils = require("marko.utils")
 
 	-- Ensure project_path ends with a path separator to prevent partial path matches
 	local normalized_project_path = project_path
@@ -17,8 +18,8 @@ function M.filter_marks(project_path)
 	end
 
 	-- Debug info
-	-- vim.notify("Filtering marks for project path: " .. project_path, vim.log.levels.INFO, { title = "marko.nvim" })
-	-- vim.notify("Normalized project path: " .. normalized_project_path, vim.log.levels.INFO, { title = "marko.nvim" })
+	utils.log("Filtering marks for project path: " .. project_path, vim.log.levels.INFO, { title = "marko.nvim" })
+	utils.log("Normalized project path: " .. normalized_project_path, vim.log.levels.INFO, { title = "marko.nvim" })
 
 	-- Get the HOME path for tilde expansion
 	local home_dir = os.getenv("HOME")
@@ -28,7 +29,7 @@ function M.filter_marks(project_path)
 	local tilde_project_path = project_path
 	if home_dir and string.find(project_path, home_dir) == 1 then
 		tilde_project_path = "~" .. string.sub(project_path, #home_dir + 1)
-		-- vim.notify("Tilde project path: " .. tilde_project_path, vim.log.levels.INFO, { title = "marko.nvim" })
+		utils.log("Tilde project path: " .. tilde_project_path, vim.log.levels.INFO, { title = "marko.nvim" })
 	end
 
 	-- Create normalized tilde path
@@ -48,7 +49,7 @@ function M.filter_marks(project_path)
 		else
 			debug_info = debug_info .. "No path (empty or nil)"
 		end
-		-- vim.notify(debug_info, vim.log.levels.INFO, { title = "marko.nvim" })
+		utils.log(debug_info, vim.log.levels.INFO, { title = "marko.nvim" })
 
 		-- More detailed validation
 		local valid = mark_path ~= "" and mark_path ~= nil
@@ -62,7 +63,7 @@ function M.filter_marks(project_path)
 			local expanded_mark_path = mark_file_path
 			if string.find(mark_file_path, home_pattern) == 1 and home_dir then
 				expanded_mark_path = home_dir .. string.sub(mark_file_path, 2)
-				-- vim.notify("Expanded mark path: " .. expanded_mark_path, vim.log.levels.INFO, { title = "marko.nvim" })
+				utils.log("Expanded mark path: " .. expanded_mark_path, vim.log.levels.INFO, { title = "marko.nvim" })
 			end
 
 			-- Multiple ways to check for path match:
@@ -408,15 +409,16 @@ end
 
 -- Save directory marks to config file
 function M.save_directory_marks(config_path, directory_path)
+	local utils = require("marko.utils")
 	directory_path = directory_path or vim.fn.getcwd()
 
-	-- vim.notify("Save called for directory: " .. directory_path, vim.log.levels.INFO, { title = "marko.nvim" })
-	-- vim.notify("Config path: " .. config_path, vim.log.levels.INFO, { title = "marko.nvim" })
+	utils.log("Save called for directory: " .. directory_path, vim.log.levels.INFO, { title = "marko.nvim" })
+	utils.log("Config path: " .. config_path, vim.log.levels.INFO, { title = "marko.nvim" })
 
 	-- Ensure we have valid directory_path
 	if not directory_path or directory_path == "" then
 		directory_path = vim.fn.getcwd()
-		-- vim.notify("Using current directory instead: " .. directory_path, vim.log.levels.INFO, { title = "marko.nvim" })
+		utils.log("Using current directory instead: " .. directory_path, vim.log.levels.INFO, { title = "marko.nvim" })
 	end
 
 	-- Step 1: Ensure config file exists
@@ -425,14 +427,14 @@ function M.save_directory_marks(config_path, directory_path)
 		-- Create config file first
 		local success, err = M.create_path(config_path)
 		if not success then
-			vim.notify("Error creating config file path: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
+			utils.log("Error creating config file path: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
 			return nil, err
 		end
 
 		-- Initialize with empty content
 		local success, err = M.write_file(config_path, "")
 		if not success then
-			vim.notify("Error initializing config file: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
+			utils.log("Error initializing config file: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
 			return nil, err
 		end
 	end
@@ -440,7 +442,7 @@ function M.save_directory_marks(config_path, directory_path)
 	-- Step 2: Read existing config
 	local content, err = M.read_file(config_path)
 	if not content then
-		vim.notify(
+		utils.log(
 			"Error reading config file: " .. (err or "unknown error"),
 			vim.log.levels.ERROR,
 			{ title = "marko.nvim" }
@@ -458,17 +460,17 @@ function M.save_directory_marks(config_path, directory_path)
 		if success and result and type(result) == "table" then
 			parsed_config = result
 		else
-			vim.notify("Warning: Failed to parse config, starting fresh", vim.log.levels.WARN, { title = "marko.nvim" })
+			utils.log("Warning: Failed to parse config, starting fresh", vim.log.levels.WARN, { title = "marko.nvim" })
 		end
 	end
 
 	-- Step 4: Get current marks for this directory
 	local curr_marks = M.filter_marks(directory_path)
-	-- vim.notify(
-	-- 	"Found " .. #curr_marks .. " marks for directory: " .. directory_path,
-	-- 	vim.log.levels.INFO,
-	-- 	{ title = "marko.nvim" }
-	-- )
+	utils.log(
+		"Found " .. #curr_marks .. " marks for directory: " .. directory_path,
+		vim.log.levels.INFO,
+		{ title = "marko.nvim" }
+	)
 
 	-- Step 5: Update the config with current directory marks while preserving other directories
 	local updated_content = M.update_config(parsed_config, directory_path, curr_marks)
@@ -476,15 +478,15 @@ function M.save_directory_marks(config_path, directory_path)
 	-- Step 6: Write the updated config back to file
 	local success, err = M.write_file(config_path, updated_content)
 	if not success then
-		vim.notify("Error saving directory marks: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
+		utils.log("Error saving directory marks: " .. err, vim.log.levels.ERROR, { title = "marko.nvim" })
 		return nil, err
 	end
 
-	-- vim.notify(
-	-- 	"Successfully saved " .. #curr_marks .. " marks for directory: " .. directory_path,
-	-- 	vim.log.levels.INFO,
-	-- 	{ title = "marko.nvim" }
-	-- )
+	utils.log(
+		"Successfully saved " .. #curr_marks .. " marks for directory: " .. directory_path,
+		vim.log.levels.INFO,
+		{ title = "marko.nvim" }
+	)
 
 	-- Return the updated parsed config
 	local new_config = M.parse_config(updated_content)

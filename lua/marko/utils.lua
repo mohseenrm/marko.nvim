@@ -28,72 +28,75 @@ end
 function M.set_global_mark(mark, row, col, buffer, filename)
 	-- Validate mark is a capital letter
 	if not mark:match("^%u$") then
-		vim.notify("Invalid mark: " .. mark .. " (must be A-Z)", vim.log.levels.ERROR, { title = "marko.nvim" })
+		M.log("Invalid mark: " .. mark .. " (must be A-Z)", vim.log.levels.ERROR, { title = "marko.nvim" })
 		return false
 	end
 
 	-- Ensure row and col are numbers
 	row = tonumber(row) or 1
 	col = tonumber(col) or 0
-	
+
 	-- Expand tilde in path if present
 	local expanded_filename = filename
 	if filename:match("^~/") then
 		local home_dir = os.getenv("HOME")
 		if home_dir then
 			expanded_filename = home_dir .. filename:sub(2)
-			vim.notify("Expanded filename from " .. filename .. " to " .. expanded_filename, 
-				vim.log.levels.INFO, { title = "marko.nvim" })
+			M.log(
+				"Expanded filename from " .. filename .. " to " .. expanded_filename,
+				vim.log.levels.INFO,
+				{ title = "marko.nvim" }
+			)
 		end
 	end
-	
+
 	-- Use Neovim's API to create a buffer if needed
 	if buffer == 0 or not vim.api.nvim_buf_is_valid(buffer) then
 		-- Check if file exists
 		if vim.fn.filereadable(expanded_filename) == 0 then
-			vim.notify("File not found: " .. expanded_filename, vim.log.levels.WARN, { title = "marko.nvim" })
+			M.log("File not found: " .. expanded_filename, vim.log.levels.WARN, { title = "marko.nvim" })
 			return false
 		end
-		
+
 		-- Create a new buffer
 		buffer = vim.fn.bufadd(expanded_filename)
 		if buffer == 0 then
-			vim.notify("Failed to create buffer for: " .. expanded_filename, vim.log.levels.ERROR, { title = "marko.nvim" })
+			M.log("Failed to create buffer for: " .. expanded_filename, vim.log.levels.ERROR, { title = "marko.nvim" })
 			return false
 		end
 	end
-	
+
 	-- Set the mark - use correct API based on Neovim version
 	local success = false
-	
+
 	-- Neovim 0.10+ has a global nvim_set_mark function
-	if vim.fn.has('nvim-0.10') == 1 and vim.api.nvim_set_mark then
+	if vim.fn.has("nvim-0.10") == 1 and vim.api.nvim_set_mark then
 		success = vim.api.nvim_set_mark(mark, row, col, {})
 	else
 		-- For older Neovim versions, use buffer-specific mark setting
 		success = vim.api.nvim_buf_set_mark(buffer, mark, row, col, {})
 	end
-	
+
 	if success then
-		vim.notify(
+		M.log(
 			"Successfully set global mark " .. mark .. " for " .. filename,
 			vim.log.levels.INFO,
 			{ title = "marko.nvim" }
 		)
-		
+
 		-- Double-check mark was set correctly
 		local check = vim.api.nvim_get_mark(mark, {})
 		if check and check[4] then
-			vim.notify(
+			M.log(
 				"Mark " .. mark .. " set at " .. (check[4] or "unknown"),
 				vim.log.levels.INFO,
 				{ title = "marko.nvim" }
 			)
 		end
 	else
-		vim.notify("Failed to set mark " .. mark .. " for " .. filename, vim.log.levels.ERROR, { title = "marko.nvim" })
+		M.log("Failed to set mark " .. mark .. " for " .. filename, vim.log.levels.ERROR, { title = "marko.nvim" })
 	end
-	
+
 	return success
 end
 
@@ -120,6 +123,29 @@ function M.get_nested(tbl, keys, default)
 	end
 
 	return current
+end
+
+-- Get the debug state from marko options
+function M.is_debug_enabled()
+	local marko = package.loaded["marko"]
+	if marko and marko.options and marko.options.debug == true then
+		return true
+	end
+	return false
+end
+
+-- Conditionally log based on debug setting
+-- @param message The message to log
+-- @param level The log level (vim.log.levels)
+-- @param opts Additional options for notify
+function M.log(message, level, opts)
+	-- Always show errors and warnings
+	if level == vim.log.levels.ERROR or level == vim.log.levels.WARN then
+		vim.notify(message, level, opts)
+	-- Only show info and debug messages if debug is enabled
+	elseif M.is_debug_enabled() then
+		vim.notify(message, level, opts)
+	end
 end
 
 return M
