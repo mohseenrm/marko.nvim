@@ -1,0 +1,42 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        neovim-version: ["v0.7.0", "v0.8.0", "v0.9.0", "nightly"]
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Lua
+        uses: leafo/gh-actions-lua@v9
+        with:
+          luaVersion: "5.1"
+
+      - name: Install Neovim
+        uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: ${{ matrix.neovim-version }}
+
+      - name: Check Neovim version
+        run: nvim --version
+
+      - name: Run Tests
+        run: lua tests/run.lua
+
+      - name: Notify on failure
+        if: ${{ failure() }}
+        run: |
+          echo "Tests failed with Neovim ${{ matrix.neovim-version }}"
+

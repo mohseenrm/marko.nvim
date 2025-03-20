@@ -1,5 +1,8 @@
 # marko.nvim
 
+[![Tests](https://github.com/mohseenrm/marko.nvim/actions/workflows/tests.yml/badge.svg)](https://github.com/mohseenrm/marko.nvim/actions/workflows/tests.yml)
+[![Lint](https://github.com/mohseenrm/marko.nvim/actions/workflows/lint.yml/badge.svg)](https://github.com/mohseenrm/marko.nvim/actions/workflows/lint.yml)
+
 A behind the scene global marks manager for Neovim. Marko saves and restores your global marks for each project directory, so they persist across Neovim sessions and are properly isolated between projects.
 
 ## Features ✨
