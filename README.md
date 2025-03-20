@@ -1,13 +1,13 @@
 # marko.nvim
 
-A behind the scene global marks manager for Neovim. Marko saves and restores your marks for each project directory, so they persist across Neovim sessions and are properly isolated between projects.
+A behind the scene global marks manager for Neovim. Marko saves and restores your global marks for each project directory, so they persist across Neovim sessions and are properly isolated between projects.
 
 ## Features ✨
 
-- **Project-Scoped Marks**: Only see marks that belong to your current working directory
-- **Persistent Marks**: Marks are automatically saved when you exit Neovim and restored when you return
-- **Proper File type Detection**: Ensures buffers opened via marks have proper syntax highlighting
-- **Simple Commands**: Easy-to-use commands for managing your marks
+- **Project-Scoped Global Marks**: Only see global marks that belong to your current working directory
+- **Persistent Global Marks**: Global Marks are automatically saved when you exit Neovim and restored when you return
+- **Proper File type Detection**: Ensures buffers opened via global marks have proper syntax highlighting
+- **Simple Commands**: Easy-to-use commands for managing your global marks
 
 ## Installation 🚀
 
@@ -70,9 +70,9 @@ Navigate to marks using the standard Neovim commands:
 
 Marko provides the following commands:
 
-- `:MarkoSave` - Manually save marks for the current directory
-- `:MarkoReload` - Clear all marks and reload from config
-- `:MarkoDeleteConfig` - Delete the marks config file (with confirmation)
+- `:MarkoSave` - Manually save global marks for the current directory
+- `:MarkoReload` - Clear all global marks and reload from config
+- `:MarkoDeleteConfig` - Delete the global marks config file (with confirmation)
 
 ### Configuration
 
@@ -92,19 +92,19 @@ require("marko").setup({
 
 ## How It Works
 
-Marko saves your marks in `~/.local/share/nvim/marko/config.yaml` and manages them based on your current working directory. When you start Neovim in a project, it will:
+Marko saves your global marks in `~/.local/share/nvim/marko/config.yaml` and manages them based on your current working directory. When you start Neovim in a project, it will:
 
-1. Clear all existing marks
-2. Load marks from config that match your current directory
-3. Set those marks in the appropriate files
+1. Clear all existing global marks
+2. Loads global marks from config that match your current directory
+3. Set those global marks in the appropriate files
 
-When you exit Neovim, your current marks are saved automatically.
+When you exit Neovim, your current global marks are saved automatically.
 
 ## Features Explained
 
 ### Project-Based Filtering
 
-Marko only shows and restores marks that belong to the current project directory. This prevents marks from other projects showing up in your current project.
+Marko only shows and restores global marks that belong to the current project directory. This prevents global marks from other projects showing up in your current project.
 
 ### Syntax Highlighting
 
