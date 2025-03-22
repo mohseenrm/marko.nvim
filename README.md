@@ -30,6 +30,8 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 ```lua
 {
   "mohseenrm/marko.nvim",
+  lazy = true,
+  event = "VeryLazy",
   config = function()
     require("marko").setup()
   end
@@ -41,6 +43,8 @@ Or with configuration options using lazy.nvim's `opts` feature:
 ```lua
 {
   "mohseenrm/marko.nvim",
+  lazy = true,
+  event = "VeryLazy",
   opts = {
     debug = false
   }
