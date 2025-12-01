@@ -3,14 +3,15 @@
 [![Tests](https://github.com/mohseenrm/marko.nvim/actions/workflows/tests.yaml/badge.svg)](https://github.com/mohseenrm/marko.nvim/actions/workflows/tests.yaml)
 [![Lint](https://github.com/mohseenrm/marko.nvim/actions/workflows/lint.yaml/badge.svg)](https://github.com/mohseenrm/marko.nvim/actions/workflows/lint.yaml)
 
-A behind the scene global marks manager for Neovim. Marko saves and restores your global marks for each project directory, so they persist across Neovim sessions and are properly isolated between projects.
+A project-aware global marks manager for Neovim. Marko automatically isolates global marks per project using Neovim's native ShaDa (shared data) system, ensuring marks from different projects don't interfere with each other.
 
 ## Features ✨
 
-- **Project-Scoped Global Marks**: Only see global marks that belong to your current working directory
-- **Persistent Global Marks**: Global Marks are automatically saved when you exit Neovim and restored when you return
-- **Proper File type Detection**: Ensures buffers opened via global marks have proper syntax highlighting
-- **Simple Commands**: Easy-to-use commands for managing your global marks
+- **Project-Scoped Global Marks**: Each project directory gets its own isolated set of global marks
+- **Persistent Global Marks**: Marks are automatically saved when you exit Neovim and restored when you return to the same project
+- **Leverages Native ShaDa**: Works with Neovim's built-in shared data system instead of fighting against it
+- **Zero Configuration**: Just install and it works automatically
+- **Simple Commands**: Easy-to-use commands for managing and inspecting your marks
 
 ## Installation 🚀
 
@@ -19,6 +20,8 @@ Using [packer.nvim](https://github.com/wbthomason/packer.nvim):
 ```lua
 use {
   "mohseenrm/marko.nvim",
+  priority = 1000,
+  lazy = false,
   config = function()
     require("marko").setup()
   end
@@ -30,6 +33,8 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 ```lua
 {
   "mohseenrm/marko.nvim",
+  priority = 1000,
+  lazy = false,
   config = function()
     require("marko").setup()
   end
@@ -41,8 +46,10 @@ Or with configuration options using lazy.nvim's `opts` feature:
 ```lua
 {
   "mohseenrm/marko.nvim",
+  priority = 1000,
+  lazy = false,
   opts = {
-    debug = false
+    debug = false  -- Set to true for verbose logging
   }
 }
 ```
@@ -73,11 +80,11 @@ Navigate to marks using the standard Neovim commands:
 
 Marko provides the following commands:
 
-- `:MarkoSave` - Manually save global marks for the current directory
-- `:MarkoReload` - Clear all global marks and reload from config
-- `:MarkoDeleteConfig` - Delete the global marks config file (with confirmation)
+- `:MarkoInfo` - Display current project directory, ShaDa file location, and all active global marks
+- `:MarkoList` - List all project-specific ShaDa files managed by Marko
+- `:MarkoClean` - Delete the ShaDa file for current project (clears all marks, with confirmation)
+- `:MarkoSave` - Manually save ShaDa for the current project
 - `:MarkoMark {A-Z}` - Set a global mark at the current cursor position (e.g., `:MarkoMark A` sets mark A)
-- `:MarkoDebug` - Display detailed information about all global marks, including filtered marks for the current directory and config file content
 
 ### Configuration
 
@@ -91,66 +98,52 @@ Setup with custom options:
 
 ```lua
 require("marko").setup({
-  debug = false      -- Set to true for verbose logging
+  debug = false  -- Set to true for verbose logging
 })
 ```
 
 ## How It Works
 
-Marko saves your global marks in `~/.local/share/nvim/marko/config.yaml` and manages them based on your current working directory. When you start Neovim in a project, it will:
+Marko leverages Neovim's native ShaDa (shared data) system to isolate marks per project. When you start Neovim:
 
-1. Clear all existing global marks
-2. Loads global marks from config that match your current directory
-3. Expands paths that start with `~` to full absolute paths
-4. Set those global marks in the appropriate files
-5. Automatically adjusts line numbers if they're outside the valid range for a file
+1. Marko detects your current working directory (absolute path)
+2. Sets Neovim's `shadafile` option to a project-specific ShaDa file in `~/.local/state/nvim/marko/`
+3. Loads the ShaDa file for that project, restoring all marks from your last session
 
-When you exit Neovim, your current global marks are saved automatically. The plugin handles both absolute and relative paths, automatically expanding home directory references (`~`) to ensure proper mark restoration across different environments.
+When you exit Neovim:
+
+1. Neovim automatically saves the current state (marks, registers, history) to the project-specific ShaDa file
+2. Next time you open that project, your marks are exactly as you left them
+
+**Key benefit**: Each project directory has completely isolated marks. Opening project A won't show marks from project B, and vice versa. This works with Neovim's native systems instead of trying to override them.
 
 ## Features Explained
 
-### Project-Based Filtering
+### Project-Based Isolation
 
-Marko only shows and restores global marks that belong to the current project directory. This prevents global marks from other projects showing up in your current project.
+Each project (identified by its absolute working directory path) gets its own ShaDa file stored in `~/.local/state/nvim/marko/`. The filename is generated from the project path to ensure uniqueness.
 
-### Syntax Highlighting
+For example:
 
-When jumping to marks, Marko ensures that buffer filetype is correctly set to maintain proper syntax highlighting.
+- `/home/user/projects/app1` → `~/.local/state/nvim/marko/marko__home_user_projects_app1.shada`
+- `/home/user/projects/app2` → `~/.local/state/nvim/marko/marko__home_user_projects_app2.shada`
 
-### Configuration File
+### What Gets Isolated
 
-Marks are stored in a YAML file with the following structure:
+Because Marko uses project-specific ShaDa files, the following are also isolated per project:
 
-```yaml
-/path/to/project1:
-  - mark: "A"
-    data:
-      row: 10
-      col: 0
-      buffer: 1
-      filename: "/path/to/project1/file.lua"
-  - mark: "B"
-    data:
-      row: 20
-      col: 5
-      buffer: 1
-      filename: "/path/to/project1/another.lua"
-/path/to/project2:
-  - mark: "C"
-    data:
-      row: 15
-      col: 2
-      buffer: 1
-      filename: "/path/to/project2/test.lua"
-  - mark: "D"
-    data:
-      row: 5
-      col: 0
-      buffer: 3
-      filename: "~/Projects/project2/config.lua"
-```
+- Global marks (A-Z)
+- Command history
+- Search history
+- Registers
+- Jump list
+- Buffer list
 
-Both absolute paths and paths with `~` (home directory) are supported. The plugin will automatically expand `~` to the full home directory path when restoring marks.
+This is a **feature**, not a bug - it keeps your projects truly separate!
+
+### ShaDa Files
+
+ShaDa files are Neovim's native format for storing session data. They use MessagePack encoding and handle merging, timestamps, and error recovery automatically. By using ShaDa, Marko benefits from all of Neovim's built-in persistence features without reinventing the wheel.
 
 ## Development
 
@@ -172,14 +165,10 @@ Want to contribute to marko.nvim? Here's how to set up your local development en
 
 ### Plugin Structure
 
-- `lua/marko/init.lua`: Main entry point, setup function
-- `lua/marko/config.lua`: Configuration and mark management
-- `lua/marko/file.lua`: File operations and path handling
-- `lua/marko/parser.lua`: YAML parsing utilities
-- `lua/marko/utils.lua`: Helper functions
-- `lua/marko/yaml.lua`: YAML serialization/deserialization
+- `lua/marko/init.lua`: Main entry point, ShaDa management
+- `lua/marko/globals.lua`: Global variable definitions for luacheck
 - `plugin/init.lua`: Plugin initialization
-- `tests/`: Test suite
+- `tests/`: Test suite (needs updating for new approach)
 
 ### Running Tests
 
@@ -189,6 +178,8 @@ Tests are written in a simple test framework:
 # Run the full test suite
 lua tests/run.lua
 ```
+
+**Note**: Tests need to be updated to reflect the new ShaDa-based approach.
 
 ### Linting
 
@@ -203,7 +194,7 @@ export PATH=~/.luarocks/bin:$PATH
 luacheck lua/
 
 # Run luacheck on a specific file
-luacheck lua/marko/file.lua
+luacheck lua/marko/init.lua
 ```
 
 Luacheck configuration is managed via the `.luacheckrc` file at the project root.
@@ -241,6 +232,8 @@ Then run `:PackerSync` to load the local version
 {
   dir = "~/path/to/marko.nvim",
   dev = true,
+  priority = 1000,
+  lazy = false,
   opts = {
     debug = true -- Enable debug logging during development
   }
@@ -248,8 +241,6 @@ Then run `:PackerSync` to load the local version
 ```
 
 Then restart Neovim or run `:Lazy sync` to load the local version
-
-You can also add a `dependencies` table if your plugin depends on other plugins during development.
 
 ### Debugging
 

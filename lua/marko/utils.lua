@@ -166,5 +166,3 @@ function M.log(message, level, opts)
 end
 
 return M
-
-
