@@ -24,9 +24,5 @@ exclude_files = {
 ignore = {
   "212", -- Unused argument
   "631", -- Line too long
-}
-
--- Allow accessing globals defined in vim namespace
-read_globals = {
-  "vim",
+  "122", -- Setting read-only field (false positive for vim.o)
 }

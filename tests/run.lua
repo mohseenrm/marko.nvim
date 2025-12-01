@@ -100,17 +100,18 @@ end
 
 print("Running marko.nvim tests...")
 
--- List of test files to run
-local test_files = {
-	"file_spec",
-	"config_spec",
-	"integration_spec",
-}
+-- NOTE: Old tests (file_spec, config_spec, integration_spec) are deprecated
+-- They were written for v1.x which used custom YAML config
+-- TODO: Rewrite comprehensive tests for v2.0 ShaDa-based implementation
 
--- Run each test file
-for _, file in ipairs(test_files) do
-	print("\nRunning tests from " .. file .. ".lua")
-	require("tests." .. file)
+-- For now, run the basic test to verify core functionality
+local basic_test = require("tests.basic_test")
+local success = basic_test.run()
+
+if success then
+	print("\n✅ All tests passed!")
+	os.exit(0)
+else
+	print("\n❌ Tests failed!")
+	os.exit(1)
 end
-
-print("\nTests completed!")
