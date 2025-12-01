@@ -68,6 +68,41 @@ local function setup_project_shada()
 			{ title = "marko.nvim" }
 		)
 	end
+
+	-- Validate marks after loading to prevent "Cursor position outside buffer" errors
+	-- This happens when files change between sessions
+	vim.schedule(function()
+		for i = 65, 90 do -- A-Z
+			local mark = string.char(i)
+			local pos = vim.api.nvim_get_mark(mark, {})
+
+			-- Check if mark exists and has a file
+			if pos[1] > 0 and pos[4] and pos[4] ~= "" then
+				local file = pos[4]
+				local line = pos[1]
+
+				-- Try to get the buffer for this file
+				local bufnr = vim.fn.bufnr(file)
+
+				if bufnr ~= -1 then
+					-- Buffer exists, check if line is valid
+					local line_count = vim.api.nvim_buf_line_count(bufnr)
+					if line > line_count then
+						-- Mark points beyond end of buffer, delete it
+						vim.api.nvim_del_mark(mark)
+						if M.options.debug then
+							vim.notify(
+								string.format("Removed invalid mark '%s (line %d > %d lines in %s)",
+									mark, line, line_count, vim.fn.fnamemodify(file, ":t")),
+								vim.log.levels.INFO,
+								{ title = "marko.nvim" }
+							)
+						end
+					end
+				end
+			end
+		end
+	end)
 end
 
 function M.setup(opts)
