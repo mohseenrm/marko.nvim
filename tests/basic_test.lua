@@ -38,7 +38,9 @@ function M.run()
 		api = {
 			nvim_create_user_command = function() end,
 			nvim_create_autocmd = function() end,
-			nvim_create_augroup = function() return 1 end,
+			nvim_create_augroup = function()
+				return 1
+			end,
 		},
 	}
 
