@@ -9,7 +9,7 @@ A project-aware global marks manager for Neovim. Marko automatically isolates gl
 
 - **Project-Scoped Global Marks**: Each project directory gets its own isolated set of global marks
 - **Persistent Global Marks**: Marks are automatically saved when you exit Neovim and restored when you return to the same project
-- **Leverages Native ShaDa**: Works with Neovim's built-in shared data system instead of fighting against it
+- **Leverages Native ShaDa**: Works with Neovim's built-in shared data system
 - **Zero Configuration**: Just install and it works automatically
 - **Simple Commands**: Easy-to-use commands for managing and inspecting your marks
 
@@ -127,19 +127,6 @@ For example:
 
 - `/home/user/projects/app1` → `~/.local/state/nvim/marko/marko__home_user_projects_app1.shada`
 - `/home/user/projects/app2` → `~/.local/state/nvim/marko/marko__home_user_projects_app2.shada`
-
-### What Gets Isolated
-
-Because Marko uses project-specific ShaDa files, the following are also isolated per project:
-
-- Global marks (A-Z)
-- Command history
-- Search history
-- Registers
-- Jump list
-- Buffer list
-
-This is a **feature**, not a bug - it keeps your projects truly separate!
 
 ### ShaDa Files
 
